@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {  
@@ -43,14 +43,74 @@ import {
   Activity,
   Brain,
   Lightbulb,
-  Package
+  Package,
+  X,
+  ExternalLink
 } from 'lucide-react'
+
+type Notification = {
+  id: string
+  type: 'reminder' | 'alert' | 'info' | 'success'
+  title: string
+  message: string
+  time: string
+  read: boolean
+  link?: string
+}
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([
+    {
+      id: 'n1',
+      type: 'reminder',
+      title: 'Equipment Maintenance Due',
+      message: 'High-Pressure Washer maintenance is due on 2025-01-15',
+      time: '5 min ago',
+      read: false,
+      link: '/admin/equipment-permits'
+    },
+    {
+      id: 'n2',
+      type: 'alert',
+      title: 'Permit Expiring Soon',
+      message: 'Safety Compliance Certificate expires in 3 days',
+      time: '1 hour ago',
+      read: false,
+      link: '/admin/equipment-permits'
+    },
+    {
+      id: 'n3',
+      type: 'info',
+      title: 'New Lead Added',
+      message: 'Hassan Al-Mazrouei added to hot leads',
+      time: '2 hours ago',
+      read: false,
+      link: '/admin/marketing'
+    },
+    {
+      id: 'n4',
+      type: 'success',
+      title: 'Campaign Update',
+      message: 'Holiday Special 2025 campaign reached 400 opens',
+      time: '3 hours ago',
+      read: true,
+      link: '/admin/marketing'
+    },
+    {
+      id: 'n5',
+      type: 'info',
+      title: 'Follow-up Scheduled',
+      message: 'Email scheduled for Ahmed Al-Mazrouei at 10:00 AM',
+      time: '4 hours ago',
+      read: true,
+      link: '/admin/marketing'
+    }
+  ])
   const [crmOpen, setCrmOpen] = useState(pathname.startsWith('/admin/crm'))
   const [surveysOpen, setSurveysOpen] = useState(pathname.startsWith('/admin/surveys'))
   const [quotationsOpen, setQuotationsOpen] = useState(pathname.startsWith('/admin/quotations'))
@@ -78,6 +138,38 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Sign out failed:', err)
       setIsSigningOut(false)
+    }
+  }
+
+  const handleMarkAsRead = (id: string) => {
+    setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n))
+  }
+
+  const handleMarkAllAsRead = () => {
+    setNotifications(notifications.map(n => ({ ...n, read: true })))
+  }
+
+  const handleDeleteNotification = (id: string) => {
+    setNotifications(notifications.filter(n => n.id !== id))
+  }
+
+  const unreadCount = notifications.filter(n => !n.read).length
+
+  const getNotificationIcon = (type: string) => {
+    switch(type) {
+      case 'reminder': return <Clock className="w-5 h-5" />
+      case 'alert': return <AlertTriangle className="w-5 h-5" />
+      case 'success': return <CheckCircle className="w-5 h-5" />
+      default: return <Bell className="w-5 h-5" />
+    }
+  }
+
+  const getNotificationColor = (type: string) => {
+    switch(type) {
+      case 'reminder': return 'bg-amber-100 text-amber-700'
+      case 'alert': return 'bg-red-100 text-red-700'
+      case 'success': return 'bg-green-100 text-green-700'
+      default: return 'bg-blue-100 text-blue-700'
     }
   }
   
@@ -155,6 +247,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         { label: 'Finance Center', href: '/admin/finance/finance-reports', icon: BarChartIcon },
       ]
     },
+    { icon: TrendingUp, label: 'Marketing', href: '/admin/marketing' },
     {
       icon: Shield,
       label: 'Admin Management',
@@ -436,11 +529,129 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </div>
           
           <div className="flex items-center gap-3">
-            <button className="p-2.5 rounded-xl hover:bg-accent relative transition-colors group">
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2.5 rounded-xl hover:bg-accent relative transition-colors group"
+            >
               <Bell className="h-5 w-5 text-muted-foreground group-hover:text-foreground" />
-              <span className="absolute top-2.5 right-2.5 h-2 w-2 bg-red-600 rounded-full border-2 border-card"></span>
+              {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 h-5 w-5 bg-red-600 rounded-full border-2 border-card flex items-center justify-center text-[10px] font-black text-white">
+                  {unreadCount}
+                </span>
+              )}
             </button>
           </div>
+
+          {/* Notification Panel */}
+          {showNotifications && (
+            <>
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setShowNotifications(false)}
+              />
+              <div className="absolute right-8 top-20 w-96 bg-card border rounded-2xl shadow-2xl z-50 max-h-[600px] overflow-hidden flex flex-col">
+                <div className="p-4 border-b flex items-center justify-between bg-muted/50">
+                  <div>
+                    <h3 className="font-black text-foreground">Notifications</h3>
+                    <p className="text-xs text-muted-foreground">{unreadCount} unread</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {unreadCount > 0 && (
+                      <button 
+                        onClick={handleMarkAllAsRead}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-700 px-3 py-1 bg-blue-50 rounded-lg"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => setShowNotifications(false)}
+                      className="p-1 hover:bg-accent rounded-lg"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-y-auto flex-1">
+                  {notifications.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                      <p className="text-muted-foreground font-medium">No notifications</p>
+                      <p className="text-muted-foreground text-sm mt-1">You're all caught up!</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {notifications.map((notification) => (
+                        <div 
+                          key={notification.id}
+                          className={`p-4 hover:bg-muted/50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`p-2 rounded-lg ${getNotificationColor(notification.type)}`}>
+                              {getNotificationIcon(notification.type)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <h4 className="font-bold text-sm text-foreground">{notification.title}</h4>
+                                {!notification.read && (
+                                  <span className="h-2 w-2 bg-blue-600 rounded-full shrink-0 mt-1.5"></span>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">{notification.message}</p>
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">{notification.time}</span>
+                                <div className="flex gap-2">
+                                  {notification.link && (
+                                    <Link
+                                      href={notification.link}
+                                      onClick={() => {
+                                        handleMarkAsRead(notification.id)
+                                        setShowNotifications(false)
+                                      }}
+                                      className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                    >
+                                      View <ExternalLink className="w-3 h-3" />
+                                    </Link>
+                                  )}
+                                  {!notification.read && (
+                                    <button
+                                      onClick={() => handleMarkAsRead(notification.id)}
+                                      className="text-xs font-bold text-gray-600 hover:text-gray-700"
+                                    >
+                                      Mark read
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeleteNotification(notification.id)}
+                                    className="text-xs font-bold text-red-600 hover:text-red-700"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 border-t bg-muted/50">
+                  <button 
+                    onClick={() => {
+                      setShowNotifications(false)
+                      router.push('/admin/equipment-permits')
+                    }}
+                    className="w-full text-sm font-bold text-blue-600 hover:text-blue-700 py-2"
+                  >
+                    View All Notifications
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </header>
 
         <main className="flex-1 p-8 overflow-y-auto bg-muted/20">

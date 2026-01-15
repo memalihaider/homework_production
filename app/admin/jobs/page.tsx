@@ -17,7 +17,12 @@ import {
   Play,
   Eye,
   Bell,
-  BellOff
+  BellOff,
+  ShoppingCart,
+  Edit,
+  Zap,
+  AlertTriangle,
+  Check
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -52,6 +57,20 @@ interface Job {
   reminderEnabled?: boolean
   reminderDate?: string
   reminderSent?: boolean
+  services?: JobService[]
+  overtimeRequired?: boolean
+  overtimeHours?: number
+  overtimeReason?: string
+  overtimeApproved?: boolean
+}
+
+interface JobService {
+  id: number
+  name: string
+  quantity: number
+  unitPrice: number
+  total: number
+  description?: string
 }
 
 interface NewJobForm {
@@ -74,6 +93,7 @@ interface NewJobForm {
   tags: string
   specialInstructions: string
   recurring: boolean
+  services?: JobService[]
 }
 
 const INITIAL_JOBS: Job[] = [
@@ -106,7 +126,11 @@ const INITIAL_JOBS: Job[] = [
     assignedTo: ['John Smith', 'Sarah Johnson'],
     reminderEnabled: true,
     reminderDate: '2025-01-19',
-    reminderSent: false
+    reminderSent: false,
+    overtimeRequired: true,
+    overtimeHours: 2,
+    overtimeReason: 'Extended hours to complete additional sanitization',
+    overtimeApproved: false
   },
   {
     id: 2,
@@ -238,6 +262,7 @@ export default function JobsPage() {
   const [selectedJobForExecution, setSelectedJobForExecution] = useState<Job | null>(null)
   const [executionChecklist, setExecutionChecklist] = useState<string[]>([])
   const [executionNotes, setExecutionNotes] = useState('')
+  const [editingJobId, setEditingJobId] = useState<number | null>(null)
 
   const [newJobForm, setNewJobForm] = useState<NewJobForm>({
     title: '',
@@ -258,7 +283,8 @@ export default function JobsPage() {
     permits: '',
     tags: '',
     specialInstructions: '',
-    recurring: false
+    recurring: false,
+    services: []
   })
 
   // Calculate statistics
@@ -308,6 +334,7 @@ export default function JobsPage() {
   }
 
   const handleAddJob = () => {
+    setEditingJobId(null)
     setNewJobForm({
       title: '',
       client: '',
@@ -327,7 +354,35 @@ export default function JobsPage() {
       permits: '',
       tags: '',
       specialInstructions: '',
-      recurring: false
+      recurring: false,
+      services: []
+    })
+    setShowNewJobModal(true)
+  }
+
+  const handleEditJob = (job: Job) => {
+    setEditingJobId(job.id)
+    setNewJobForm({
+      title: job.title,
+      client: job.client,
+      clientId: job.clientId,
+      priority: job.priority,
+      scheduledDate: job.scheduledDate || '',
+      scheduledTime: job.scheduledTime || '',
+      endTime: job.endTime || '',
+      location: job.location,
+      teamRequired: job.teamRequired,
+      budget: job.budget,
+      description: job.description,
+      riskLevel: job.riskLevel,
+      slaDeadline: job.slaDeadline || '',
+      estimatedDuration: job.estimatedDuration,
+      requiredSkills: job.requiredSkills.join(', '),
+      permits: job.permits.join(', '),
+      tags: job.tags.join(', '),
+      specialInstructions: job.specialInstructions || '',
+      recurring: job.recurring,
+      services: job.services || []
     })
     setShowNewJobModal(true)
   }
@@ -339,45 +394,82 @@ export default function JobsPage() {
     }
 
     try {
-      const newJob: Job = {
-        id: Math.max(...jobs.map(j => j.id), 0) + 1,
-        title: newJobForm.title,
-        client: newJobForm.client,
-        clientId: newJobForm.clientId || 0,
-        status: 'Pending',
-        priority: newJobForm.priority,
-        scheduledDate: newJobForm.scheduledDate || null,
-        scheduledTime: newJobForm.scheduledTime,
-        endTime: newJobForm.endTime,
-        location: newJobForm.location,
-        teamRequired: newJobForm.teamRequired,
-        budget: newJobForm.budget,
-        actualCost: 0,
-        description: newJobForm.description,
-        riskLevel: newJobForm.riskLevel,
-        slaDeadline: newJobForm.slaDeadline,
-        estimatedDuration: newJobForm.estimatedDuration,
-        requiredSkills: newJobForm.requiredSkills.split(',').map(s => s.trim()).filter(s => s),
-        permits: newJobForm.permits.split(',').map(s => s.trim()).filter(s => s),
-        tags: newJobForm.tags.split(',').map(s => s.trim()).filter(s => s),
-        specialInstructions: newJobForm.specialInstructions,
-        recurring: newJobForm.recurring,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        executionLogs: [],
-        assignedTo: [],
-        reminderEnabled: false,
-        reminderDate: undefined,
-        reminderSent: false
-      }
+      if (editingJobId) {
+        // Update existing job
+        const updated = jobs.map(j =>
+          j.id === editingJobId
+            ? {
+                ...j,
+                title: newJobForm.title,
+                client: newJobForm.client,
+                clientId: newJobForm.clientId || 0,
+                priority: newJobForm.priority,
+                scheduledDate: newJobForm.scheduledDate || null,
+                scheduledTime: newJobForm.scheduledTime,
+                endTime: newJobForm.endTime,
+                location: newJobForm.location,
+                teamRequired: newJobForm.teamRequired,
+                budget: newJobForm.budget,
+                description: newJobForm.description,
+                riskLevel: newJobForm.riskLevel,
+                slaDeadline: newJobForm.slaDeadline,
+                estimatedDuration: newJobForm.estimatedDuration,
+                requiredSkills: newJobForm.requiredSkills.split(',').map(s => s.trim()).filter(s => s),
+                permits: newJobForm.permits.split(',').map(s => s.trim()).filter(s => s),
+                tags: newJobForm.tags.split(',').map(s => s.trim()).filter(s => s),
+                specialInstructions: newJobForm.specialInstructions,
+                recurring: newJobForm.recurring,
+                updatedAt: new Date().toISOString(),
+                services: newJobForm.services || []
+              }
+            : j
+        )
+        setJobs(updated)
+        setEditingJobId(null)
+        alert('Job updated successfully!')
+      } else {
+        // Create new job
+        const newJob: Job = {
+          id: Math.max(...jobs.map(j => j.id), 0) + 1,
+          title: newJobForm.title,
+          client: newJobForm.client,
+          clientId: newJobForm.clientId || 0,
+          status: 'Pending',
+          priority: newJobForm.priority,
+          scheduledDate: newJobForm.scheduledDate || null,
+          scheduledTime: newJobForm.scheduledTime,
+          endTime: newJobForm.endTime,
+          location: newJobForm.location,
+          teamRequired: newJobForm.teamRequired,
+          budget: newJobForm.budget,
+          actualCost: 0,
+          description: newJobForm.description,
+          riskLevel: newJobForm.riskLevel,
+          slaDeadline: newJobForm.slaDeadline,
+          estimatedDuration: newJobForm.estimatedDuration,
+          requiredSkills: newJobForm.requiredSkills.split(',').map(s => s.trim()).filter(s => s),
+          permits: newJobForm.permits.split(',').map(s => s.trim()).filter(s => s),
+          tags: newJobForm.tags.split(',').map(s => s.trim()).filter(s => s),
+          specialInstructions: newJobForm.specialInstructions,
+          recurring: newJobForm.recurring,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          executionLogs: [],
+          assignedTo: [],
+          reminderEnabled: false,
+          reminderDate: undefined,
+          reminderSent: false,
+          services: newJobForm.services || []
+        }
 
-      setJobs([...jobs, newJob])
+        setJobs([...jobs, newJob])
+        alert('Job created successfully!')
+      }
       setShowNewJobModal(false)
-      alert('Job created successfully!')
     } catch (error) {
-      alert('Error creating job. Please try again.')
+      alert('Error saving job. Please try again.')
     }
-  }, [newJobForm, jobs])
+  }, [newJobForm, jobs, editingJobId])
 
   const handleToggleReminder = useCallback((jobId: number) => {
     setJobs(jobs.map(j => {
@@ -530,6 +622,13 @@ export default function JobsPage() {
               <Plus className="w-4 h-4" />
               New Job
             </button>
+
+            <Link href="/admin/jobs/expense-manager">
+              <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors">
+                <DollarSign className="w-4 h-4" />
+                Expense Manager
+              </button>
+            </Link>
           </div>
         </div>
       </div>
@@ -550,31 +649,29 @@ export default function JobsPage() {
                           </h3>
                           <p className="text-sm text-gray-600 mt-1">{job.client}</p>
                         </div>
-                        <div className="flex gap-2">
-                          <span className={`text-xs font-bold px-3 py-1 border rounded-full ${getPriorityColor(job.priority)}`}>
-                            {job.priority}
-                          </span>
-                          <span className={`text-xs font-bold px-3 py-1 border rounded-full ${getStatusColor(job.status)}`}>
-                            {job.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 flex-shrink-0" />
-                          <span>{job.location}</span>
+                          <div className="flex gap-2 flex-wrap justify-end">
+                            <span className={`text-xs font-bold px-3 py-1 border rounded-full ${getPriorityColor(job.priority)}`}>
+                              {job.priority}
+                            </span>
+                            <span className={`text-xs font-bold px-3 py-1 border rounded-full ${getStatusColor(job.status)}`}>
+                              {job.status}
+                            </span>
+                            {job.overtimeRequired && (
+                              <span className={`text-xs font-bold px-3 py-1 border rounded-full flex items-center gap-1 ${job.overtimeApproved ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>
+                                <Zap className="h-3 w-3" /> OT: {job.overtimeHours}h {job.overtimeApproved ? '✓' : ''}
+                              </span>
+                            )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 flex-shrink-0" />
+                          <Calendar className="h-4 w-4 shrink-0" />
                           <span>{job.scheduledDate ? new Date(job.scheduledDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }) : 'Not scheduled'}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 flex-shrink-0" />
+                          <Users className="h-4 w-4 shrink-0" />
                           <span>{job.teamRequired} members</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 flex-shrink-0" />
+                          <DollarSign className="h-4 w-4 shrink-0" />
                           <span>AED {job.budget.toLocaleString()}</span>
                         </div>
                       </div>
@@ -589,6 +686,13 @@ export default function JobsPage() {
                   <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100">
                     {job.status === 'Pending' && (
                       <>
+                        <button
+                          onClick={() => handleEditJob(job)}
+                          className="text-xs px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium flex items-center gap-1"
+                        >
+                          <Edit className="h-3 w-3" />
+                          Edit
+                        </button>
                         <button
                           onClick={() => handleUpdateJobStatus(job.id, 'Scheduled')}
                           className="text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium"
@@ -606,26 +710,35 @@ export default function JobsPage() {
                     )}
 
                     {(job.status === 'Scheduled' || job.status === 'In Progress') && (
-                      <button
-                        onClick={() => handleToggleReminder(job.id)}
-                        className={`text-xs px-3 py-1.5 rounded-lg transition-colors font-medium flex items-center gap-1 ${
-                          job.reminderEnabled
-                            ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {job.reminderEnabled ? (
-                          <>
-                            <Bell className="h-3 w-3" />
-                            Reminder Set
-                          </>
-                        ) : (
-                          <>
-                            <BellOff className="h-3 w-3" />
-                            Set Reminder
-                          </>
-                        )}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleEditJob(job)}
+                          className="text-xs px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium flex items-center gap-1"
+                        >
+                          <Edit className="h-3 w-3" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleToggleReminder(job.id)}
+                          className={`text-xs px-3 py-1.5 rounded-lg transition-colors font-medium flex items-center gap-1 ${
+                            job.reminderEnabled
+                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {job.reminderEnabled ? (
+                            <>
+                              <Bell className="h-3 w-3" />
+                              Reminder Set
+                            </>
+                          ) : (
+                            <>
+                              <BellOff className="h-3 w-3" />
+                              Set Reminder
+                            </>
+                          )}
+                        </button>
+                      </>
                     )}
 
                     {job.reminderEnabled && job.reminderDate && (
@@ -700,12 +813,12 @@ export default function JobsPage() {
           <div className="absolute inset-0 bg-black bg-opacity-40" onClick={() => setShowNewJobModal(false)}></div>
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col">
             {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex justify-between items-center">
+            <div className="sticky top-0 bg-linear-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">Create New Job</h2>
+                <h2 className="text-2xl font-bold">{editingJobId ? 'Edit Job' : 'Create New Job'}</h2>
                 <p className="text-blue-100 text-sm mt-1">Complete all job details</p>
               </div>
-              <button onClick={() => setShowNewJobModal(false)} className="text-blue-100 hover:text-white transition-colors">
+              <button onClick={() => { setShowNewJobModal(false); setEditingJobId(null) }} className="text-blue-100 hover:text-white transition-colors">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -946,6 +1059,121 @@ export default function JobsPage() {
                 </div>
               </div>
 
+              {/* Services */}
+              <div className="space-y-4 border-b pb-6">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5 text-blue-600" />
+                  Job Services
+                </h3>
+                <p className="text-sm text-gray-600">Add services to this job that can be charged to the client</p>
+                
+                <button
+                  onClick={() => {
+                    const newService: JobService = {
+                      id: Math.random(),
+                      name: '',
+                      quantity: 1,
+                      unitPrice: 0,
+                      total: 0
+                    }
+                    setNewJobForm({
+                      ...newJobForm,
+                      services: [...(newJobForm.services || []), newService]
+                    })
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 font-medium"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Service
+                </button>
+
+                <div className="space-y-3">
+                  {(newJobForm.services || []).map((service, idx) => (
+                    <div key={service.id} className="p-4 border border-gray-300 rounded-lg space-y-3 bg-gray-50">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                          <label className="block text-sm font-medium text-gray-900 mb-1">Service Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g., Window Cleaning"
+                            value={service.name}
+                            onChange={(e) => {
+                              const updated = [...(newJobForm.services || [])]
+                              updated[idx].name = e.target.value
+                              setNewJobForm({ ...newJobForm, services: updated })
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-900 mb-1">Quantity</label>
+                          <input
+                            type="number"
+                            placeholder="1"
+                            value={service.quantity}
+                            onChange={(e) => {
+                              const updated = [...(newJobForm.services || [])]
+                              updated[idx].quantity = parseInt(e.target.value) || 0
+                              updated[idx].total = updated[idx].quantity * updated[idx].unitPrice
+                              setNewJobForm({ ...newJobForm, services: updated })
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-900 mb-1">Unit Price (AED)</label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={service.unitPrice}
+                            onChange={(e) => {
+                              const updated = [...(newJobForm.services || [])]
+                              updated[idx].unitPrice = parseInt(e.target.value) || 0
+                              updated[idx].total = updated[idx].quantity * updated[idx].unitPrice
+                              setNewJobForm({ ...newJobForm, services: updated })
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-900 mb-1">Total (AED)</label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={service.total}
+                            disabled
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-900 mb-1">Description (Optional)</label>
+                        <textarea
+                          placeholder="Service description..."
+                          value={service.description || ''}
+                          onChange={(e) => {
+                            const updated = [...(newJobForm.services || [])]
+                            updated[idx].description = e.target.value
+                            setNewJobForm({ ...newJobForm, services: updated })
+                          }}
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          const updated = (newJobForm.services || []).filter((_, i) => i !== idx)
+                          setNewJobForm({ ...newJobForm, services: updated })
+                        }}
+                        className="text-red-600 hover:text-red-700 text-sm font-medium"
+                      >
+                        Remove Service
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Special Instructions */}
               <div className="space-y-4 border-b pb-6">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -982,7 +1210,7 @@ export default function JobsPage() {
             {/* Action Buttons - Fixed Bottom */}
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
               <button
-                onClick={() => setShowNewJobModal(false)}
+                onClick={() => { setShowNewJobModal(false); setEditingJobId(null) }}
                 className="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 font-semibold transition-colors"
               >
                 Cancel
@@ -992,7 +1220,7 @@ export default function JobsPage() {
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
-                Create Job
+                {editingJobId ? 'Update Job' : 'Create Job'}
               </button>
             </div>
           </div>

@@ -377,9 +377,7 @@ export const getQuotations = (): Quotation[] => {
   const saved = localStorage.getItem('homeware_quotations')
   if (saved) {
     try {
-      const parsed = JSON.parse(saved)
-      // Validate and fix any quotations with missing client data
-      return validateAndFixQuotations(parsed)
+      return JSON.parse(saved)
     } catch (e) {
       console.error('Error loading quotations from localStorage:', e)
     }
@@ -388,10 +386,8 @@ export const getQuotations = (): Quotation[] => {
 }
 
 export const saveQuotations = (quotations: Quotation[]) => {
-  // Validate quotations before saving
-  const validatedQuotations = validateAndFixQuotations(quotations)
-  quotationsData = validatedQuotations
-  localStorage.setItem('homeware_quotations', JSON.stringify(validatedQuotations))
+  quotationsData = quotations
+  localStorage.setItem('homeware_quotations', JSON.stringify(quotations))
 }
 
 export const addQuotation = (quotation: Quotation) => {
@@ -420,28 +416,6 @@ export const deleteQuotation = (id: number) => {
 export const getQuotationById = (id: number): Quotation | undefined => {
   const quotations = getQuotations()
   return quotations.find(q => q.id === id)
-}
-
-export const validateAndFixQuotations = (quotations: Quotation[]): Quotation[] => {
-  return quotations.map(quotation => {
-    if (!quotation.client || !quotation.client.name) {
-      // Assign a default client if client data is missing
-      return {
-        ...quotation,
-        client: {
-          id: 0,
-          name: 'Unknown Client',
-          company: 'Unknown Company',
-          email: 'unknown@example.com',
-          phone: 'N/A',
-          location: 'N/A',
-          contactPerson: 'N/A',
-          tier: 'Bronze' as const
-        }
-      }
-    }
-    return quotation
-  })
 }
 
 // Initialize with default data if localStorage is empty

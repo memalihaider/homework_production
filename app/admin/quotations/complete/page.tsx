@@ -6,7 +6,8 @@ import {
   FileText, DollarSign, Calendar, User, Building2, MapPin, Percent, Tag,
   ShoppingCart, Settings, FileCheck, Clock, Copy, MessageCircle, Save,
   ChevronDown, Check, AlertCircle, CheckCircle, Eye as EyeIcon,
-  MoreVertical, Zap, Mail as MailIcon, MessageSquare
+  MoreVertical, Zap, Mail as MailIcon, MessageSquare, CreditCard, Bell,
+  AlertTriangle, CheckCheck, Smartphone, Banknote
 } from 'lucide-react'
 
 interface Quotation {
@@ -28,6 +29,8 @@ interface Quotation {
   status: 'Draft' | 'Sent' | 'Accepted' | 'Rejected' | 'Expired' | 'Cancelled'
   date: string
   validUntil: string
+  dueDate: string
+  paymentMethods: string[]
   template: 'standard' | 'professional' | 'minimal' | 'detailed'
   services: QuotationService[]
   products: QuotationProduct[]
@@ -38,6 +41,8 @@ interface Quotation {
   lastModified: string
   approvalStatus?: 'Pending' | 'Approved' | 'Rejected'
   sentVia?: string[]
+  reminderSent?: boolean
+  reminderSentDate?: string
 }
 
 interface QuotationService {
@@ -85,6 +90,8 @@ const INITIAL_QUOTATIONS: Quotation[] = [
     status: 'Sent',
     date: '2025-01-10',
     validUntil: '2025-02-10',
+    dueDate: '2025-02-10',
+    paymentMethods: ['bank-transfer', 'credit-card'],
     template: 'professional',
     services: [
       { id: 1, name: 'Residential Cleaning', quantity: 1, unitPrice: 15000, total: 15000, description: 'Complete residential cleaning' },
@@ -97,7 +104,8 @@ const INITIAL_QUOTATIONS: Quotation[] = [
     version: 1,
     lastModified: '2025-01-10',
     approvalStatus: 'Approved',
-    sentVia: ['email']
+    sentVia: ['email'],
+    reminderSent: false
   },
   {
     id: 2,
@@ -117,6 +125,8 @@ const INITIAL_QUOTATIONS: Quotation[] = [
     status: 'Accepted',
     date: '2025-01-12',
     validUntil: '2025-02-12',
+    dueDate: '2025-02-12',
+    paymentMethods: ['bank-transfer', 'installment'],
     template: 'detailed',
     services: [
       { id: 3, name: 'Hotel Maintenance', quantity: 12, unitPrice: 8500, total: 102000, description: 'Monthly maintenance contract' }
@@ -126,7 +136,9 @@ const INITIAL_QUOTATIONS: Quotation[] = [
     version: 1,
     lastModified: '2025-01-12',
     approvalStatus: 'Approved',
-    sentVia: ['email', 'whatsapp']
+    sentVia: ['email', 'whatsapp'],
+    reminderSent: true,
+    reminderSentDate: '2025-01-14'
   }
 ]
 
@@ -143,15 +155,61 @@ const AVAILABLE_CLIENTS = [
   { id: 3, name: 'Fatima Al-Noor', company: 'Al Noor Logistics', email: 'fatima@alnoorlogistics.ae', phone: '+971-50-2222222' }
 ]
 
+interface HistoryRecord {
+  id: number
+  quotationId: number
+  quoteNumber: string
+  type: 'created' | 'modified' | 'sent' | 'accepted' | 'rejected' | 'invoice_generated' | 'contract_generated'
+  timestamp: string
+  user: string
+  details: string
+  metadata?: any
+}
+
+interface Reminder {
+  id: number
+  documentId: number
+  documentNumber: string
+  documentType: 'quotation' | 'invoice' | 'contract'
+  dueDate: string
+  reminderDate: string
+  reminderSent: boolean
+  reminderSentDate?: string
+  clientName: string
+  amount: number
+  status: 'overdue' | 'due-soon' | 'on-time'
+  reminderMethod: 'email' | 'sms' | 'whatsapp'
+}
+
+const PAYMENT_METHODS = [
+  { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' },
+  { id: 'credit-card', name: 'Credit Card', icon: '💳' },
+  { id: 'cheque', name: 'Cheque', icon: '📄' },
+  { id: 'cash', name: 'Cash', icon: '💵' },
+  { id: 'online-payment', name: 'Online Payment', icon: '🌐' },
+  { id: 'installment', name: 'Installment Plan', icon: '📊' }
+]
+
 export default function QuotationsPage() {
   const [quotations, setQuotations] = useState<Quotation[]>(INITIAL_QUOTATIONS)
-  const [activeTab, setActiveTab] = useState<'builder' | 'list' | 'approval'>('list')
+  const [activeTab, setActiveTab] = useState<'builder' | 'list' | 'approval' | 'quotation-history' | 'generation-history' | 'invoice-history' | 'contract-history' | 'notifications'>('list')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null)
+  const [history, setHistory] = useState<HistoryRecord[]>([
+    { id: 1, quotationId: 1, quoteNumber: '#QT-001-2025', type: 'created', timestamp: '2025-01-10 10:30 AM', user: 'Ahmed Al-Mazrouei', details: 'Quotation created for Ahmed Al-Mansouri', metadata: { amount: 25500, status: 'Draft' } },
+    { id: 2, quotationId: 1, quoteNumber: '#QT-001-2025', type: 'modified', timestamp: '2025-01-10 11:45 AM', user: 'Ahmed Al-Mazrouei', details: 'Applied 15% discount and updated pricing', metadata: { discount: 15, originalAmount: 30000 } },
+    { id: 3, quotationId: 1, quoteNumber: '#QT-001-2025', type: 'sent', timestamp: '2025-01-10 02:00 PM', user: 'Ahmed Al-Mazrouei', details: 'Quotation sent via Email', metadata: { method: 'email', recipient: 'ahmed@dubaiprop.ae' } },
+    { id: 4, quotationId: 1, quoteNumber: '#QT-001-2025', type: 'invoice_generated', timestamp: '2025-01-12 09:15 AM', user: 'Fatima Al-Ketbi', details: 'Invoice #INV-001-2025 generated from quotation', metadata: { invoiceNumber: 'INV-001-2025', amount: 25500 } },
+    { id: 5, quotationId: 1, quoteNumber: '#QT-001-2025', type: 'contract_generated', timestamp: '2025-01-12 10:30 AM', user: 'Fatima Al-Ketbi', details: 'Contract generated for execution', metadata: { contractNumber: 'CTR-001-2025', documentUrl: '/contracts/CTR-001-2025.pdf' } },
+    { id: 6, quotationId: 2, quoteNumber: '#QT-002-2025', type: 'created', timestamp: '2025-01-12 08:00 AM', user: 'Hassan Al-Mazrouei', details: 'Quotation created for Paradise Hotels', metadata: { amount: 102000, status: 'Draft' } },
+    { id: 7, quotationId: 2, quoteNumber: '#QT-002-2025', type: 'sent', timestamp: '2025-01-12 03:30 PM', user: 'Hassan Al-Mazrouei', details: 'Quotation sent via Email and WhatsApp', metadata: { methods: ['email', 'whatsapp'], recipient: 'layla@paradisehotels.ae' } },
+    { id: 8, quotationId: 2, quoteNumber: '#QT-002-2025', type: 'accepted', timestamp: '2025-01-13 09:00 AM', user: 'System', details: 'Quotation accepted by client', metadata: { acceptanceDate: '2025-01-13', acceptedBy: 'Layla Hassan' } }
+  ])
   const [showBuilder, setShowBuilder] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendMethod, setSendMethod] = useState<'email' | 'whatsapp' | null>(null)
+  const [editingQuotationId, setEditingQuotationId] = useState<number | null>(null)
 
   const [builderForm, setBuilderForm] = useState<Partial<Quotation>>({
     template: 'professional',
@@ -160,8 +218,14 @@ export default function QuotationsPage() {
     currency: 'AED',
     taxRate: 5,
     discount: 0,
-    discountType: 'percentage'
+    discountType: 'percentage',
+    paymentMethods: ['bank-transfer']
   })
+  const [reminders, setReminders] = useState<Reminder[]>([
+    { id: 1, documentId: 1, documentNumber: '#QT-001-2025', documentType: 'quotation', dueDate: '2025-02-10', reminderDate: '2025-02-03', reminderSent: false, clientName: 'Ahmed Al-Mansouri', amount: 25500, status: 'due-soon', reminderMethod: 'email' },
+    { id: 2, documentId: 2, documentNumber: '#QT-002-2025', documentType: 'quotation', dueDate: '2025-02-12', reminderDate: '2025-02-05', reminderSent: true, reminderSentDate: '2025-01-14', clientName: 'Layla Hassan', amount: 102000, status: 'on-time', reminderMethod: 'email' },
+    { id: 3, documentId: 1, documentNumber: '#INV-001-2025', documentType: 'invoice', dueDate: '2025-02-12', reminderDate: '2025-02-05', reminderSent: false, clientName: 'Ahmed Al-Mansouri', amount: 25500, status: 'due-soon', reminderMethod: 'email' }
+  ])
 
   // Filter quotations
   const filteredQuotations = useMemo(() => {
@@ -181,46 +245,94 @@ export default function QuotationsPage() {
     totalValue: quotations.reduce((sum, q) => sum + q.amount, 0)
   }), [quotations])
 
+  const handleEditQuotation = (quotation: Quotation) => {
+    setEditingQuotationId(quotation.id)
+    setBuilderForm({
+      ...quotation,
+      clientId: quotation.clientId
+    })
+    setActiveTab('builder')
+  }
+
+  const handleDeleteQuotation = (quotationId: number) => {
+    if (window.confirm('Are you sure you want to delete this quotation?')) {
+      setQuotations(quotations.filter(q => q.id !== quotationId))
+      alert('Quotation deleted successfully!')
+    }
+  }
+
   const handleSaveQuotation = useCallback(() => {
     if (!builderForm.client || !builderForm.email) {
       alert('Please fill in client details')
       return
     }
 
-    const newQuote: Quotation = {
-      id: Math.max(...quotations.map(q => q.id), 0) + 1,
-      quoteNumber: `#QT-${String(quotations.length + 1).padStart(3, '0')}-2025`,
-      clientId: builderForm.clientId || 1,
-      client: builderForm.client || '',
-      company: builderForm.company || '',
-      email: builderForm.email || '',
-      phone: builderForm.phone || '',
-      location: builderForm.location || '',
-      amount: calculateTotal(),
-      amountOriginal: calculateSubtotal(),
-      discount: builderForm.discount || 0,
-      discountType: builderForm.discountType || 'percentage',
-      taxRate: builderForm.taxRate || 5,
-      currency: builderForm.currency || 'AED',
-      status: 'Draft',
-      date: new Date().toISOString().split('T')[0],
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      template: builderForm.template as any || 'professional',
-      services: builderForm.services || [],
-      products: builderForm.products || [],
-      notes: builderForm.notes,
-      terms: builderForm.terms,
-      paymentTerms: builderForm.paymentTerms,
-      version: 1,
-      lastModified: new Date().toISOString().split('T')[0],
-      approvalStatus: 'Pending'
-    }
+    if (editingQuotationId) {
+      // Update existing quotation
+      const updated = quotations.map(q =>
+        q.id === editingQuotationId
+          ? {
+              ...q,
+              ...builderForm,
+              client: builderForm.client || '',
+              company: builderForm.company || '',
+              email: builderForm.email || '',
+              phone: builderForm.phone || '',
+              location: builderForm.location || '',
+              amount: calculateTotal(),
+              amountOriginal: calculateSubtotal(),
+              services: builderForm.services || [],
+              products: builderForm.products || [],
+              lastModified: new Date().toISOString().split('T')[0],
+              version: q.version + 1
+            }
+          : q
+      )
+      setQuotations(updated)
+      setEditingQuotationId(null)
+      alert('Quotation updated successfully!')
+    } else {
+      // Create new quotation with automatic 30-day due date
+      const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const newQuote: Quotation = {
+        id: Math.max(...quotations.map(q => q.id), 0) + 1,
+        quoteNumber: `#QT-${String(quotations.length + 1).padStart(3, '0')}-2025`,
+        clientId: builderForm.clientId || 1,
+        client: builderForm.client || '',
+        company: builderForm.company || '',
+        email: builderForm.email || '',
+        phone: builderForm.phone || '',
+        location: builderForm.location || '',
+        amount: calculateTotal(),
+        amountOriginal: calculateSubtotal(),
+        discount: builderForm.discount || 0,
+        discountType: builderForm.discountType || 'percentage',
+        taxRate: builderForm.taxRate || 5,
+        currency: builderForm.currency || 'AED',
+        status: 'Draft',
+        date: new Date().toISOString().split('T')[0],
+        validUntil: dueDate,
+        dueDate: dueDate,
+        paymentMethods: builderForm.paymentMethods || ['bank-transfer'],
+        template: builderForm.template as any || 'professional',
+        services: builderForm.services || [],
+        products: builderForm.products || [],
+        notes: builderForm.notes,
+        terms: builderForm.terms,
+        paymentTerms: builderForm.paymentTerms,
+        version: 1,
+        lastModified: new Date().toISOString().split('T')[0],
+        approvalStatus: 'Pending',
+        reminderSent: false
+      }
 
-    setQuotations([...quotations, newQuote])
+      setQuotations([...quotations, newQuote])
+      alert('Quotation created successfully with 30-day payment due date!')
+    }
+    
     setShowBuilder(false)
-    setBuilderForm({ template: 'professional', services: [], products: [], currency: 'AED', taxRate: 5 })
-    alert('Quotation created successfully!')
-  }, [builderForm, quotations])
+    setBuilderForm({ template: 'professional', services: [], products: [], currency: 'AED', taxRate: 5, paymentMethods: ['bank-transfer'] })
+  }, [builderForm, quotations, editingQuotationId])
 
   const calculateSubtotal = () => {
     const servicesTotal = (builderForm.services || []).reduce((sum, s) => sum + (s.total || 0), 0)
@@ -288,103 +400,177 @@ export default function QuotationsPage() {
   }
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-4 pb-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Quotations Management</h1>
-        <p className="text-gray-600">Create, edit, and manage quotations with multiple templates</p>
+        <h1 className="text-2xl font-bold text-gray-900">Quotations Management</h1>
+        <p className="text-sm text-gray-600 mt-1">Create, edit, and manage quotations</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-gray-600 text-sm">Total Quotations</p>
-          <p className="text-2xl font-bold text-gray-900 mt-2">{stats.total}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+          <p className="text-gray-600 text-xs font-medium">Total</p>
+          <p className="text-xl font-bold text-gray-900 mt-1">{stats.total}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-gray-600 text-sm">Draft</p>
-          <p className="text-2xl font-bold text-gray-500 mt-2">{stats.draft}</p>
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+          <p className="text-gray-600 text-xs font-medium">Draft</p>
+          <p className="text-xl font-bold text-gray-500 mt-1">{stats.draft}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-gray-600 text-sm">Sent</p>
-          <p className="text-2xl font-bold text-blue-600 mt-2">{stats.sent}</p>
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+          <p className="text-gray-600 text-xs font-medium">Sent</p>
+          <p className="text-xl font-bold text-blue-600 mt-1">{stats.sent}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-gray-600 text-sm">Total Value</p>
-          <p className="text-2xl font-bold text-green-600 mt-2">AED {stats.totalValue.toLocaleString()}</p>
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+          <p className="text-gray-600 text-xs font-medium">Total Value</p>
+          <p className="text-lg font-bold text-green-600 mt-1">AED {(stats.totalValue / 1000).toFixed(0)}K</p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="bg-white border border-gray-200 rounded-lg">
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-200 overflow-x-auto">
           <button
             onClick={() => setActiveTab('builder')}
-            className={`flex-1 px-4 py-3 font-semibold text-center transition-colors ${
+            className={`px-4 py-2 font-medium text-sm text-center transition-colors whitespace-nowrap ${
               activeTab === 'builder'
                 ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Plus className="w-4 h-4 inline mr-2" />
+            <Plus className="w-3 h-3 inline mr-1" />
             Builder
           </button>
           <button
             onClick={() => setActiveTab('list')}
-            className={`flex-1 px-4 py-3 font-semibold text-center transition-colors ${
+            className={`px-4 py-2 font-medium text-sm text-center transition-colors whitespace-nowrap ${
               activeTab === 'list'
                 ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <FileText className="w-4 h-4 inline mr-2" />
+            <FileText className="w-3 h-3 inline mr-1" />
             Quotations
           </button>
           <button
             onClick={() => setActiveTab('approval')}
-            className={`flex-1 px-4 py-3 font-semibold text-center transition-colors ${
+            className={`px-4 py-2 font-medium text-sm text-center transition-colors whitespace-nowrap ${
               activeTab === 'approval'
                 ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <CheckCircle className="w-4 h-4 inline mr-2" />
+            <CheckCircle className="w-3 h-3 inline mr-1" />
             Approvals
+          </button>
+          <button
+            onClick={() => setActiveTab('quotation-history')}
+            className={`px-4 py-2 font-medium text-sm text-center transition-colors whitespace-nowrap ${
+              activeTab === 'quotation-history'
+                ? 'bg-green-50 text-green-600 border-b-2 border-green-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Clock className="w-3 h-3 inline mr-1" />
+            Quotation History
+          </button>
+          <button
+            onClick={() => setActiveTab('generation-history')}
+            className={`px-4 py-2 font-medium text-sm text-center transition-colors whitespace-nowrap ${
+              activeTab === 'generation-history'
+                ? 'bg-purple-50 text-purple-600 border-b-2 border-purple-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Zap className="w-3 h-3 inline mr-1" />
+            Generation
+          </button>
+          <button
+            onClick={() => setActiveTab('invoice-history')}
+            className={`px-4 py-2 font-medium text-sm text-center transition-colors whitespace-nowrap ${
+              activeTab === 'invoice-history'
+                ? 'bg-orange-50 text-orange-600 border-b-2 border-orange-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <FileCheck className="w-3 h-3 inline mr-1" />
+            Invoices
+          </button>
+          <button
+            onClick={() => setActiveTab('contract-history')}
+            className={`px-4 py-2 font-medium text-sm text-center transition-colors whitespace-nowrap ${
+              activeTab === 'contract-history'
+                ? 'bg-red-50 text-red-600 border-b-2 border-red-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Tag className="w-3 h-3 inline mr-1" />
+            Contracts
+          </button>
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className={`px-4 py-2 font-medium text-sm text-center transition-colors whitespace-nowrap ${
+              activeTab === 'notifications'
+                ? 'bg-red-50 text-red-600 border-b-2 border-red-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Bell className="w-3 h-3 inline mr-1" />
+            Notifications
+            {reminders.filter(r => !r.reminderSent).length > 0 && (
+              <span className="flex ml-1 bg-red-600 text-white text-xs rounded-full w-5 h-5 items-center justify-center">
+                {reminders.filter(r => !r.reminderSent).length}
+              </span>
+            )}
           </button>
         </div>
 
         {/* Builder Tab */}
         {activeTab === 'builder' && (
-          <div className="p-6 space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Create New Quotation</h2>
+          <div className="p-4 space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-900">{editingQuotationId ? 'Edit Quotation' : 'Create Quotation'}</h2>
+              {editingQuotationId && (
+                <button
+                  onClick={() => {
+                    setEditingQuotationId(null)
+                    setBuilderForm({ template: 'professional', services: [], products: [], currency: 'AED', taxRate: 5 })
+                    setActiveTab('list')
+                  }}
+                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
 
             {/* Template Selection */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-gray-900">Select Template</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <h3 className="font-semibold text-gray-900 text-sm">Select Template</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {TEMPLATES.map(template => (
                   <button
                     key={template.id}
                     onClick={() => setBuilderForm({ ...builderForm, template: template.id as any })}
-                    className={`p-4 rounded-lg border-2 transition-all text-center ${
+                    className={`p-2 rounded border-2 transition-all text-center ${
                       builderForm.template === template.id
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <p className="font-semibold text-gray-900">{template.name}</p>
-                    <p className="text-sm text-gray-600">{template.description}</p>
+                    <p className="font-semibold text-gray-900 text-xs">{template.name}</p>
+                    <p className="text-xs text-gray-600">{template.description}</p>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Client Information */}
-            <div className="space-y-4 border-t pt-6">
-              <h3 className="font-semibold text-gray-900">Client Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Client *</label>
+            <div className="space-y-2 border-t pt-4">
+              <h3 className="font-semibold text-gray-900 text-sm">Client Information</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-medium text-gray-900 mb-1">Client *</label>
                   <select
                     value={builderForm.clientId || ''}
                     onChange={(e) => {
@@ -400,7 +586,7 @@ export default function QuotationsPage() {
                         })
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     <option value="">Select a client</option>
                     {AVAILABLE_CLIENTS.map(c => (
@@ -409,50 +595,40 @@ export default function QuotationsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Company</label>
+                  <label className="block text-xs font-medium text-gray-900 mb-1">Company</label>
                   <input
                     type="text"
                     value={builderForm.company || ''}
                     onChange={(e) => setBuilderForm({ ...builderForm, company: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                     disabled
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
+                  <label className="block text-xs font-medium text-gray-900 mb-1">Email</label>
                   <input
                     type="email"
                     value={builderForm.email || ''}
                     onChange={(e) => setBuilderForm({ ...builderForm, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                     disabled
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Phone</label>
-                  <input
-                    type="text"
-                    value={builderForm.phone || ''}
-                    onChange={(e) => setBuilderForm({ ...builderForm, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    disabled
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Location</label>
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-xs font-medium text-gray-900 mb-1">Location</label>
                   <input
                     type="text"
                     value={builderForm.location || ''}
                     onChange={(e) => setBuilderForm({ ...builderForm, location: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                   />
                 </div>
               </div>
             </div>
 
             {/* Services */}
-            <div className="space-y-4 border-t pt-6">
-              <h3 className="font-semibold text-gray-900">Services</h3>
+            <div className="space-y-2 border-t pt-4">
+              <h3 className="font-semibold text-gray-900 text-sm">Services</h3>
               <button
                 onClick={() => {
                   const newService: QuotationService = {
@@ -467,15 +643,15 @@ export default function QuotationsPage() {
                     services: [...(builderForm.services || []), newService]
                   })
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1 font-medium"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3 h-3" />
                 Add Service
               </button>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {(builderForm.services || []).map((service, idx) => (
-                  <div key={service.id} className="p-4 border border-gray-200 rounded-lg space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
+                  <div key={service.id} className="p-3 border border-gray-200 rounded bg-gray-50 space-y-2">
+                    <div className="grid grid-cols-4 gap-2">
                       <input
                         type="text"
                         placeholder="Service name"
@@ -485,11 +661,11 @@ export default function QuotationsPage() {
                           updated[idx].name = e.target.value
                           setBuilderForm({ ...builderForm, services: updated })
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        className="col-span-2 px-2 py-1 border border-gray-300 rounded text-sm"
                       />
                       <input
                         type="number"
-                        placeholder="Quantity"
+                        placeholder="Qty"
                         value={service.quantity}
                         onChange={(e) => {
                           const updated = [...(builderForm.services || [])]
@@ -497,11 +673,11 @@ export default function QuotationsPage() {
                           updated[idx].total = updated[idx].quantity * updated[idx].unitPrice
                           setBuilderForm({ ...builderForm, services: updated })
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        className="px-2 py-1 border border-gray-300 rounded text-sm"
                       />
                       <input
                         type="number"
-                        placeholder="Unit price"
+                        placeholder="Price"
                         value={service.unitPrice}
                         onChange={(e) => {
                           const updated = [...(builderForm.services || [])]
@@ -509,14 +685,14 @@ export default function QuotationsPage() {
                           updated[idx].total = updated[idx].quantity * updated[idx].unitPrice
                           setBuilderForm({ ...builderForm, services: updated })
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        className="px-2 py-1 border border-gray-300 rounded text-sm"
                       />
                       <input
                         type="number"
                         placeholder="Total"
                         value={service.total}
                         disabled
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                        className="px-2 py-1 border border-gray-300 rounded text-sm bg-gray-100"
                       />
                     </div>
                     <button
@@ -524,7 +700,7 @@ export default function QuotationsPage() {
                         const updated = (builderForm.services || []).filter((_, i) => i !== idx)
                         setBuilderForm({ ...builderForm, services: updated })
                       }}
-                      className="text-red-600 hover:text-red-700 text-sm font-medium"
+                      className="text-red-600 hover:text-red-700 text-xs font-medium"
                     >
                       Remove
                     </button>
@@ -534,22 +710,22 @@ export default function QuotationsPage() {
             </div>
 
             {/* Pricing */}
-            <div className="space-y-4 border-t pt-6">
-              <h3 className="font-semibold text-gray-900">Pricing</h3>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2 border-t pt-4">
+              <h3 className="font-semibold text-gray-900 text-sm">Pricing</h3>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Discount</label>
+                  <label className="block text-xs font-medium text-gray-900 mb-1">Discount</label>
                   <div className="flex gap-2">
                     <input
                       type="number"
                       value={builderForm.discount || 0}
                       onChange={(e) => setBuilderForm({ ...builderForm, discount: parseInt(e.target.value) || 0 })}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
                     />
                     <select
                       value={builderForm.discountType || 'percentage'}
                       onChange={(e) => setBuilderForm({ ...builderForm, discountType: e.target.value as any })}
-                      className="px-3 py-2 border border-gray-300 rounded-lg"
+                      className="px-2 py-1 border border-gray-300 rounded text-sm"
                     >
                       <option value="percentage">%</option>
                       <option value="fixed">AED</option>
@@ -557,17 +733,17 @@ export default function QuotationsPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Tax Rate %</label>
+                  <label className="block text-xs font-medium text-gray-900 mb-1">Tax Rate %</label>
                   <input
                     type="number"
                     value={builderForm.taxRate || 5}
                     onChange={(e) => setBuilderForm({ ...builderForm, taxRate: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                   />
                 </div>
               </div>
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="space-y-2 text-sm">
+              <div className="bg-blue-50 p-3 rounded">
+                <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
                     <span className="font-semibold">AED {calculateSubtotal().toLocaleString()}</span>
@@ -578,63 +754,100 @@ export default function QuotationsPage() {
                       <span>-AED {(calculateSubtotal() * (builderForm.discount || 0) / 100).toLocaleString()}</span>
                     </div>
                   )}
-                  <div className="flex justify-between pt-2 border-t border-blue-200">
-                    <span>Total:</span>
-                    <span className="font-bold text-lg">AED {calculateTotal().toLocaleString()}</span>
+                  <div className="flex justify-between pt-1 border-t border-blue-200 mt-1">
+                    <span className="font-semibold">Total:</span>
+                    <span className="font-bold text-sm">AED {calculateTotal().toLocaleString()}</span>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Payment Methods */}
+            <div className="space-y-2 border-t pt-4">
+              <h3 className="font-semibold text-gray-900 text-sm">Payment Methods</h3>
+              <p className="text-xs text-gray-600 mb-3">Select payment methods accepted for this quotation</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {PAYMENT_METHODS.map(method => (
+                  <label key={method.id} className="flex items-center gap-2 p-2 border border-gray-300 rounded cursor-pointer hover:bg-blue-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={(builderForm.paymentMethods || []).includes(method.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setBuilderForm({
+                            ...builderForm,
+                            paymentMethods: [...(builderForm.paymentMethods || []), method.id]
+                          })
+                        } else {
+                          setBuilderForm({
+                            ...builderForm,
+                            paymentMethods: (builderForm.paymentMethods || []).filter(m => m !== method.id)
+                          })
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-lg">{method.icon}</span>
+                    <span className="text-xs font-medium text-gray-900">{method.name}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="bg-green-50 p-3 rounded mt-3 border border-green-200">
+                <p className="text-xs text-green-800 font-semibold">
+                  💳 Selected: {(builderForm.paymentMethods || []).map(id => PAYMENT_METHODS.find(m => m.id === id)?.name).filter(Boolean).join(', ') || 'No payment methods selected'}
+                </p>
+              </div>
+            </div>
+
             {/* Notes & Terms */}
-            <div className="space-y-4 border-t pt-6">
-              <h3 className="font-semibold text-gray-900">Additional Information</h3>
+            <div className="space-y-2 border-t pt-4">
+              <h3 className="font-semibold text-gray-900 text-sm">Additional Information</h3>
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Notes</label>
+                <label className="block text-xs font-medium text-gray-900 mb-1">Notes</label>
                 <textarea
                   value={builderForm.notes || ''}
                   onChange={(e) => setBuilderForm({ ...builderForm, notes: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  rows={2}
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                   placeholder="Additional notes..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Payment Terms</label>
+                <label className="block text-xs font-medium text-gray-900 mb-1">Payment Terms</label>
                 <textarea
                   value={builderForm.paymentTerms || ''}
                   onChange={(e) => setBuilderForm({ ...builderForm, paymentTerms: e.target.value })}
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                   placeholder="Payment terms..."
                 />
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="border-t pt-6 flex gap-3 justify-end">
+            <div className="border-t pt-3 flex gap-2 justify-end">
               <button
                 onClick={() => {
                   setShowBuilder(false)
                   setBuilderForm({ template: 'professional', services: [], products: [], currency: 'AED', taxRate: 5 })
                 }}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold"
+                className="px-4 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={() => setShowPreview(true)}
-                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold flex items-center gap-2"
+                className="px-4 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700 font-medium flex items-center gap-1"
               >
-                <Eye className="w-4 h-4" />
+                <Eye className="w-3 h-3" />
                 Preview
               </button>
               <button
                 onClick={handleSaveQuotation}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center gap-2"
+                className="px-4 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 font-medium flex items-center gap-1"
               >
-                <Save className="w-4 h-4" />
-                Save Quotation
+                <Save className="w-3 h-3" />
+                Save
               </button>
             </div>
           </div>
@@ -642,16 +855,16 @@ export default function QuotationsPage() {
 
         {/* List Tab */}
         {activeTab === 'list' && (
-          <div className="p-6 space-y-6">
-            <div className="flex gap-4">
+          <div className="p-6 space-y-4">
+            <div className="flex gap-3">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search quotations..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
               <button
@@ -659,70 +872,91 @@ export default function QuotationsPage() {
                   setBuilderForm({ template: 'professional', services: [], products: [], currency: 'AED', taxRate: 5 })
                   setActiveTab('builder')
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium text-sm whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />
-                New
+                New Quote
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {filteredQuotations.length > 0 ? (
                 filteredQuotations.map(quotation => (
-                  <div key={quotation.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-gray-900">{quotation.quoteNumber}</h3>
-                        <p className="text-sm text-gray-600">{quotation.client} - {quotation.company}</p>
+                  <div key={quotation.id} className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-all hover:border-blue-300">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                      {/* Quote Info */}
+                      <div className="md:col-span-3">
+                        <h3 className="font-bold text-gray-900 text-sm">{quotation.quoteNumber}</h3>
+                        <p className="text-xs text-gray-600 line-clamp-1">{quotation.client}</p>
+                        <p className="text-xs text-gray-500">{quotation.company}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${getStatusColor(quotation.status)}`}>
+
+                      {/* Amount & Dates */}
+                      <div className="md:col-span-4 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <p className="text-gray-500">Amount</p>
+                          <p className="font-semibold text-gray-900">AED {quotation.amount.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Date</p>
+                          <p className="font-semibold text-gray-900">{quotation.date}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Expires</p>
+                          <p className="font-semibold text-gray-900">{quotation.validUntil}</p>
+                        </div>
+                      </div>
+
+                      {/* Status Badges */}
+                      <div className="md:col-span-2 flex gap-2">
+                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${getStatusColor(quotation.status)}`}>
                           {quotation.status}
                         </span>
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${getApprovalColor(quotation.approvalStatus)}`}>
+                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${getApprovalColor(quotation.approvalStatus)}`}>
                           {quotation.approvalStatus}
                         </span>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm text-gray-600">
-                      <div><span className="font-medium">Amount:</span> AED {quotation.amount.toLocaleString()}</div>
-                      <div><span className="font-medium">Date:</span> {quotation.date}</div>
-                      <div><span className="font-medium">Valid Until:</span> {quotation.validUntil}</div>
-                      <div><span className="font-medium">Template:</span> {quotation.template}</div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setSelectedQuotation(quotation)}
-                        className="flex-1 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
-                      >
-                        <EyeIcon className="w-4 h-4 inline mr-2" />
-                        View
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedQuotation(quotation)
-                          setShowSendModal(true)
-                        }}
-                        className="flex-1 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
-                      >
-                        <Send className="w-4 h-4 inline mr-2" />
-                        Send
-                      </button>
-                      <button className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="px-3 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* Actions */}
+                      <div className="md:col-span-3 flex gap-2">
+                        <button
+                          onClick={() => setSelectedQuotation(quotation)}
+                          className="flex-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-medium"
+                        >
+                          <EyeIcon className="w-3 h-3 inline mr-1" />
+                          View
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedQuotation(quotation)
+                            setShowSendModal(true)
+                          }}
+                          className="flex-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 font-medium"
+                        >
+                          <Send className="w-3 h-3 inline mr-1" />
+                          Send
+                        </button>
+                        <button
+                          onClick={() => handleEditQuotation(quotation)}
+                          className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 font-medium"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteQuotation(quotation.id)}
+                          className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 font-medium"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-12">
-                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium text-gray-900">No quotations found</p>
+                <div className="text-center py-8">
+                  <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-gray-900 font-medium">No quotations found</p>
+                  <p className="text-sm text-gray-600">Try adjusting your search or create a new quotation</p>
                 </div>
               )}
             </div>
@@ -731,64 +965,458 @@ export default function QuotationsPage() {
 
         {/* Approval Tab */}
         {activeTab === 'approval' && (
-          <div className="p-6 space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Quotation Approvals</h2>
-            <div className="space-y-3">
+          <div className="p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900">Quotation Approvals</h2>
+            <div className="space-y-2">
               {quotations.filter(q => q.approvalStatus === 'Pending').length > 0 ? (
                 quotations
                   .filter(q => q.approvalStatus === 'Pending')
                   .map(quotation => (
-                    <div key={quotation.id} className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h3 className="font-bold text-gray-900">{quotation.quoteNumber}</h3>
-                          <p className="text-sm text-gray-600">{quotation.client}</p>
+                    <div key={quotation.id} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                        <div className="md:col-span-3">
+                          <h3 className="font-bold text-gray-900 text-sm">{quotation.quoteNumber}</h3>
+                          <p className="text-xs text-gray-600">{quotation.client}</p>
                         </div>
-                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-yellow-800">
-                          Pending Review
-                        </span>
-                      </div>
 
-                      <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
-                        <div>
-                          <span className="text-gray-600">Amount</span>
-                          <p className="font-bold text-lg">AED {quotation.amount.toLocaleString()}</p>
+                        <div className="md:col-span-4 grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <p className="text-gray-600">Amount</p>
+                            <p className="font-bold">AED {quotation.amount.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Created</p>
+                            <p className="font-semibold">{quotation.date}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Services</p>
+                            <p className="font-semibold">{quotation.services.length}</p>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-gray-600">Created</span>
-                          <p className="font-semibold">{quotation.date}</p>
+
+                        <div className="md:col-span-2">
+                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                            Pending Review
+                          </span>
                         </div>
-                        <div>
-                          <span className="text-gray-600">Services</span>
-                          <p className="font-semibold">{quotation.services.length} services</p>
+
+                        <div className="md:col-span-3 flex gap-2">
+                          <button
+                            onClick={() => handleApproveQuotation(quotation.id)}
+                            className="flex-1 px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 font-medium flex items-center justify-center gap-1"
+                          >
+                            <Check className="w-3 h-3" />
+                            Approve
+                          </button>
+                          <button className="flex-1 px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 font-medium flex items-center justify-center gap-1">
+                            <X className="w-3 h-3" />
+                            Reject
+                          </button>
                         </div>
                       </div>
+                    </div>
+                  ))
+              ) : (
+                <div className="text-center py-8">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-300" />
+                  <p className="text-gray-900 font-medium text-sm">All quotations approved!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => handleApproveQuotation(quotation.id)}
-                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2"
-                        >
-                          <Check className="w-4 h-4" />
-                          Approve
+        {/* Quotation History Tab */}
+        {activeTab === 'quotation-history' && (
+          <div className="p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900">Quotation Activity History</h2>
+            <div className="space-y-3">
+              {history.filter(h => ['created', 'modified', 'sent', 'accepted', 'rejected'].includes(h.type)).length > 0 ? (
+                history
+                  .filter(h => ['created', 'modified', 'sent', 'accepted', 'rejected'].includes(h.type))
+                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map(record => (
+                    <div key={record.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Quote Number</p>
+                          <p className="font-bold text-gray-900">{record.quoteNumber}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Activity Type</p>
+                          <div className="flex gap-1 items-center mt-1">
+                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                              record.type === 'created' ? 'bg-blue-100 text-blue-700' :
+                              record.type === 'modified' ? 'bg-amber-100 text-amber-700' :
+                              record.type === 'sent' ? 'bg-green-100 text-green-700' :
+                              record.type === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {record.type.charAt(0).toUpperCase() + record.type.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Timestamp</p>
+                          <p className="font-semibold text-gray-900 text-sm">{record.timestamp}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Performed By</p>
+                          <p className="font-semibold text-gray-900">{record.user}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Details</p>
+                          <p className="text-sm text-gray-700">{record.details}</p>
+                        </div>
+                      </div>
+                      {record.metadata && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <p className="text-xs text-gray-600 font-semibold mb-2">Metadata:</p>
+                          <pre className="bg-gray-50 p-2 rounded text-xs text-gray-600 overflow-auto">
+                            {JSON.stringify(record.metadata, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ))
+              ) : (
+                <div className="text-center py-8">
+                  <Clock className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-gray-900 font-medium text-sm">No activity history found</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Generation History Tab */}
+        {activeTab === 'generation-history' && (
+          <div className="p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900">Quotation Generation History</h2>
+            <div className="space-y-3">
+              {history.filter(h => h.type === 'created' || h.type === 'modified').length > 0 ? (
+                history
+                  .filter(h => h.type === 'created' || h.type === 'modified')
+                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map(record => (
+                    <div key={record.id} className="bg-white border border-purple-200 rounded-lg p-4 hover:shadow-md transition-all">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Quote Number</p>
+                          <p className="font-bold text-gray-900">{record.quoteNumber}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Generated By</p>
+                          <p className="font-semibold text-gray-900">{record.user}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Date & Time</p>
+                          <p className="font-semibold text-gray-900 text-sm">{record.timestamp}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Action</p>
+                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-purple-100 text-purple-700 inline-block mt-1">
+                            {record.type === 'created' ? '✨ Created' : '✏️ Modified'}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Description</p>
+                          <p className="text-sm text-gray-700">{record.details}</p>
+                        </div>
+                      </div>
+                      {record.metadata && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <p className="text-xs text-gray-600 font-semibold mb-2">Generation Details:</p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            {Object.entries(record.metadata).map(([key, value]) => (
+                              <div key={key} className="bg-purple-50 p-2 rounded">
+                                <p className="text-gray-600 text-xs font-semibold">{key}</p>
+                                <p className="font-bold text-gray-900">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+              ) : (
+                <div className="text-center py-8">
+                  <Zap className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-gray-900 font-medium text-sm">No generation history found</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Invoice History Tab */}
+        {activeTab === 'invoice-history' && (
+          <div className="p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900">Invoice Generation History</h2>
+            <div className="space-y-3">
+              {history.filter(h => h.type === 'invoice_generated').length > 0 ? (
+                history
+                  .filter(h => h.type === 'invoice_generated')
+                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map(record => (
+                    <div key={record.id} className="bg-white border border-orange-200 rounded-lg p-4 hover:shadow-md transition-all">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Quote Number</p>
+                          <p className="font-bold text-gray-900">{record.quoteNumber}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Invoice Number</p>
+                          <p className="font-bold text-orange-600">{record.metadata?.invoiceNumber || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Generated On</p>
+                          <p className="font-semibold text-gray-900 text-sm">{record.timestamp}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Amount</p>
+                          <p className="font-bold text-gray-900">AED {record.metadata?.amount?.toLocaleString() || '0'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Generated By</p>
+                          <p className="font-semibold text-gray-900">{record.user}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-gray-200 flex gap-2">
+                        <button className="px-3 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 font-medium flex items-center gap-1">
+                          <Download className="w-3 h-3" />
+                          Download Invoice
                         </button>
-                        <button className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold flex items-center justify-center gap-2">
-                          <X className="w-4 h-4" />
-                          Reject
+                        <button className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-medium flex items-center gap-1">
+                          <Send className="w-3 h-3" />
+                          Email Invoice
                         </button>
-                        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center gap-2">
-                          <MailIcon className="w-4 h-4" />
-                          Review
+                        <button className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 font-medium flex items-center gap-1">
+                          <Eye className="w-3 h-3" />
+                          View Details
                         </button>
                       </div>
                     </div>
                   ))
               ) : (
-                <div className="text-center py-12">
-                  <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-300" />
-                  <p className="text-lg font-medium text-gray-900">All quotations approved!</p>
+                <div className="text-center py-8">
+                  <FileCheck className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-gray-900 font-medium text-sm">No invoice records found</p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Contract Builder History Tab */}
+        {activeTab === 'contract-history' && (
+          <div className="p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900">Contract Builder History</h2>
+            <div className="space-y-3">
+              {history.filter(h => h.type === 'contract_generated').length > 0 ? (
+                history
+                  .filter(h => h.type === 'contract_generated')
+                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map(record => (
+                    <div key={record.id} className="bg-white border border-red-200 rounded-lg p-4 hover:shadow-md transition-all">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Quote Number</p>
+                          <p className="font-bold text-gray-900">{record.quoteNumber}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Contract Number</p>
+                          <p className="font-bold text-red-600">{record.metadata?.contractNumber || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Generated On</p>
+                          <p className="font-semibold text-gray-900 text-sm">{record.timestamp}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Status</p>
+                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-100 text-red-700 inline-block mt-1">Ready for Execution</span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold uppercase">Built By</p>
+                          <p className="font-semibold text-gray-900">{record.user}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-gray-200 flex gap-2">
+                        <button className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 font-medium flex items-center gap-1">
+                          <Download className="w-3 h-3" />
+                          Download Contract
+                        </button>
+                        <button className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-medium flex items-center gap-1">
+                          <Send className="w-3 h-3" />
+                          Send for Signature
+                        </button>
+                        <button className="px-3 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200 font-medium flex items-center gap-1">
+                          <Eye className="w-3 h-3" />
+                          Preview
+                        </button>
+                        <button className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 font-medium flex items-center gap-1">
+                          <Copy className="w-3 h-3" />
+                          Duplicate
+                        </button>
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                <div className="text-center py-8">
+                  <Tag className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-gray-900 font-medium text-sm">No contract records found</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Notifications & Reminders Tab */}
+        {activeTab === 'notifications' && (
+          <div className="p-6 space-y-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold text-gray-900">📬 Payment Reminders & Notifications</h2>
+              <div className="flex gap-2">
+                <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">
+                  {reminders.filter(r => r.status === 'overdue').length} Overdue
+                </span>
+                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
+                  {reminders.filter(r => r.status === 'due-soon').length} Due Soon
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {reminders.length > 0 ? (
+                reminders
+                  .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+                  .map(reminder => {
+                    const isOverdue = new Date(reminder.dueDate) < new Date()
+                    const isDueSoon = !isOverdue && (new Date(reminder.dueDate).getTime() - Date.now()) < 7 * 24 * 60 * 60 * 1000
+                    
+                    return (
+                      <div
+                        key={reminder.id}
+                        className={`border-l-4 rounded-lg p-4 flex justify-between items-start ${
+                          isOverdue
+                            ? 'border-l-red-600 bg-red-50 border border-red-200'
+                            : isDueSoon
+                            ? 'border-l-amber-600 bg-amber-50 border border-amber-200'
+                            : 'border-l-green-600 bg-green-50 border border-green-200'
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`text-sm font-bold px-2 py-1 rounded ${
+                              reminder.documentType === 'quotation' ? 'bg-blue-100 text-blue-700' :
+                              reminder.documentType === 'invoice' ? 'bg-orange-100 text-orange-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {reminder.documentType.toUpperCase()}
+                            </span>
+                            <h3 className="text-sm font-bold text-gray-900">{reminder.documentNumber}</h3>
+                            {isOverdue && <AlertTriangle className="w-4 h-4 text-red-600" />}
+                          </div>
+                          <p className="text-sm text-gray-700 mb-1">
+                            <strong>Client:</strong> {reminder.clientName}
+                          </p>
+                          <p className="text-sm text-gray-700 mb-2">
+                            <strong>Amount:</strong> AED {reminder.amount.toLocaleString()}
+                          </p>
+                          <div className="flex gap-3 text-xs text-gray-600">
+                            <span>📅 Due: {reminder.dueDate}</span>
+                            <span>⏰ Reminder: {reminder.reminderDate}</span>
+                            <span className={`font-semibold ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-600' : 'text-green-600'}`}>
+                              {isOverdue ? '🔴 OVERDUE' : isDueSoon ? '🟡 DUE SOON' : '🟢 ON TIME'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 ml-4">
+                          <button
+                            onClick={() => {
+                              const updated = reminders.map(r =>
+                                r.id === reminder.id
+                                  ? { ...r, reminderSent: true, reminderSentDate: new Date().toISOString().split('T')[0] }
+                                  : r
+                              )
+                              setReminders(updated)
+                              alert(`Reminder sent via ${reminder.reminderMethod === 'email' ? '📧 Email' : reminder.reminderMethod === 'sms' ? '📱 SMS' : '💬 WhatsApp'}!`)
+                            }}
+                            disabled={reminder.reminderSent}
+                            className={`px-3 py-1 text-xs rounded font-medium flex items-center gap-1 whitespace-nowrap ${
+                              reminder.reminderSent
+                                ? 'bg-gray-200 text-gray-600 cursor-not-allowed'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                          >
+                            <Send className="w-3 h-3" />
+                            {reminder.reminderSent ? 'Sent' : 'Send Reminder'}
+                          </button>
+                          
+                          <button className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 font-medium flex items-center gap-1">
+                            <Eye className="w-3 h-3" />
+                            View Details
+                          </button>
+
+                          {reminder.reminderSent && reminder.reminderSentDate && (
+                            <div className="text-xs text-gray-600 bg-white px-2 py-1 rounded border border-gray-300 text-center">
+                              ✓ Sent {reminder.reminderSentDate}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+              ) : (
+                <div className="text-center py-12">
+                  <Bell className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-gray-900 font-medium text-sm">No reminders needed</p>
+                  <p className="text-gray-600 text-xs mt-1">All quotations, invoices, and contracts are on schedule</p>
+                </div>
+              )}
+            </div>
+
+            {/* Reminder Settings */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <h3 className="text-sm font-bold text-gray-900 mb-4">⚙️ Reminder Settings</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <p className="text-sm font-semibold text-blue-900 mb-2">📧 Email Reminders</p>
+                  <p className="text-xs text-blue-800 mb-3">Automatically send payment reminders 7 days before due date</p>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="rounded" />
+                    <span className="text-xs text-blue-900 font-medium">Enabled</span>
+                  </label>
+                </div>
+                
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <p className="text-sm font-semibold text-green-900 mb-2">💬 SMS/WhatsApp Reminders</p>
+                  <p className="text-xs text-green-800 mb-3">Send SMS/WhatsApp on due date and after</p>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="rounded" />
+                    <span className="text-xs text-green-900 font-medium">Enabled</span>
+                  </label>
+                </div>
+
+                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                  <p className="text-sm font-semibold text-orange-900 mb-2">🔔 Overdue Notifications</p>
+                  <p className="text-xs text-orange-800 mb-3">Daily reminders for overdue payments</p>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="rounded" />
+                    <span className="text-xs text-orange-900 font-medium">Enabled</span>
+                  </label>
+                </div>
+
+                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                  <p className="text-sm font-semibold text-red-900 mb-2">📞 Escalation Reminders</p>
+                  <p className="text-xs text-red-800 mb-3">Notify manager for overdue beyond 30 days</p>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="rounded" />
+                    <span className="text-xs text-red-900 font-medium">Enabled</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -798,7 +1426,7 @@ export default function QuotationsPage() {
       {showSendModal && selectedQuotation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex justify-between items-center">
+            <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-bold">Send Quotation</h2>
               <button onClick={() => setShowSendModal(false)}>
                 <X className="w-6 h-6" />
@@ -848,7 +1476,7 @@ export default function QuotationsPage() {
       {showPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex justify-between items-center sticky top-0">
+            <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex justify-between items-center sticky top-0">
               <h2 className="text-xl font-bold">Quotation Preview</h2>
               <button onClick={() => setShowPreview(false)}>
                 <X className="w-6 h-6" />

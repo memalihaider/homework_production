@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Plus,
   X,
@@ -22,22 +22,111 @@ import {
   AlertTriangle,
   Eye,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  Bell,
+  History,
+  RefreshCw,
+  MapPin
 } from 'lucide-react'
 import Link from 'next/link'
 
+type Reminder = {
+  id: string
+  type: 'equipment' | 'permit'
+  itemId: number
+  itemName: string
+  reminderType: 'maintenance' | 'expiry' | 'renewal'
+  dueDate: string
+  status: 'pending' | 'completed' | 'overdue'
+  message: string
+  createdAt: string
+}
+
+type TrackingLog = {
+  id: string
+  type: 'equipment' | 'permit'
+  itemId: number
+  itemName: string
+  action: string
+  user: string
+  timestamp: string
+  details: string
+}
+
 export default function EquipmentPermitsPage() {
-  const [activeTab, setActiveTab] = useState<'equipment' | 'permits'>('equipment')
+  const [activeTab, setActiveTab] = useState<'equipment' | 'permits' | 'tracking' | 'reminders'>('equipment')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [showReminderModal, setShowReminderModal] = useState(false)
+  const [selectedItemForReminder, setSelectedItemForReminder] = useState<any>(null)
   
   // Equipment State
   const [equipment, setEquipment] = useState([
-    { id: 1, name: 'Industrial Vacuum Cleaner', category: 'Cleaning', status: 'Available', location: 'Warehouse A', purchaseDate: '2024-01-15', cost: 2500, maintenanceDate: '2025-01-10', condition: 'Excellent', quantity: 3 },
-    { id: 2, name: 'High-Pressure Washer', category: 'Outdoor', status: 'In Use', location: 'Job Site - Tower B', purchaseDate: '2023-06-20', cost: 4200, maintenanceDate: '2024-12-15', condition: 'Good', quantity: 2 },
-    { id: 3, name: 'Floor Buffer Machine', category: 'Cleaning', status: 'Available', location: 'Warehouse B', purchaseDate: '2024-03-10', cost: 3500, maintenanceDate: '2025-01-05', condition: 'Good', quantity: 1 },
-    { id: 4, name: 'Safety Harness Kit', category: 'Safety', status: 'Available', location: 'Safety Storage', purchaseDate: '2023-11-01', cost: 800, maintenanceDate: '2024-11-15', condition: 'Excellent', quantity: 10 },
-    { id: 5, name: 'Ladder (30ft)', category: 'Access', status: 'In Use', location: 'Job Site - Downtown Tower', purchaseDate: '2023-09-05', cost: 1200, maintenanceDate: '2024-10-20', condition: 'Good', quantity: 2 },
+    { id: 1, name: 'Industrial Vacuum Cleaner', category: 'Cleaning', status: 'Available', location: 'Warehouse A', purchaseDate: '2024-01-15', cost: 2500, maintenanceDate: '2025-01-20', condition: 'Excellent', quantity: 3, lastServiced: '2024-06-15' },
+    { id: 2, name: 'High-Pressure Washer', category: 'Outdoor', status: 'In Use', location: 'Job Site - Tower B', purchaseDate: '2023-06-20', cost: 4200, maintenanceDate: '2025-01-15', condition: 'Good', quantity: 2, lastServiced: '2024-07-10' },
+    { id: 3, name: 'Floor Buffer Machine', category: 'Cleaning', status: 'Available', location: 'Warehouse B', purchaseDate: '2024-03-10', cost: 3500, maintenanceDate: '2025-01-25', condition: 'Good', quantity: 1, lastServiced: '2024-08-20' },
+    { id: 4, name: 'Safety Harness Kit', category: 'Safety', status: 'Available', location: 'Safety Storage', purchaseDate: '2023-11-01', cost: 800, maintenanceDate: '2025-02-01', condition: 'Excellent', quantity: 10, lastServiced: '2024-05-15' },
+    { id: 5, name: 'Ladder (30ft)', category: 'Access', status: 'In Use', location: 'Job Site - Downtown Tower', purchaseDate: '2023-09-05', cost: 1200, maintenanceDate: '2025-01-30', condition: 'Good', quantity: 2, lastServiced: '2024-06-20' },
+  ])
+
+  // Reminders State
+  const [reminders, setReminders] = useState<Reminder[]>([
+    {
+      id: 'r1',
+      type: 'equipment',
+      itemId: 2,
+      itemName: 'High-Pressure Washer',
+      reminderType: 'maintenance',
+      dueDate: '2025-01-15',
+      status: 'pending',
+      message: 'Scheduled maintenance required',
+      createdAt: '2024-12-15'
+    },
+    {
+      id: 'r2',
+      type: 'permit',
+      itemId: 3,
+      itemName: 'Safety Compliance Certificate',
+      reminderType: 'renewal',
+      dueDate: '2025-01-10',
+      status: 'overdue',
+      message: 'Renewal required immediately',
+      createdAt: '2024-11-10'
+    }
+  ])
+
+  // Tracking Logs State
+  const [trackingLogs, setTrackingLogs] = useState<TrackingLog[]>([
+    {
+      id: 't1',
+      type: 'equipment',
+      itemId: 1,
+      itemName: 'Industrial Vacuum Cleaner',
+      action: 'Added',
+      user: 'Admin User',
+      timestamp: '2024-01-15 10:30',
+      details: 'New equipment added to inventory'
+    },
+    {
+      id: 't2',
+      type: 'equipment',
+      itemId: 2,
+      itemName: 'High-Pressure Washer',
+      action: 'Status Changed',
+      user: 'Admin User',
+      timestamp: '2024-12-20 14:15',
+      details: 'Status changed from Available to In Use'
+    },
+    {
+      id: 't3',
+      type: 'permit',
+      itemId: 1,
+      itemName: 'Building Access Pass',
+      action: 'Renewed',
+      user: 'Admin User',
+      timestamp: '2025-01-01 09:00',
+      details: 'Permit renewed for 2025'
+    }
   ])
 
   // Permits State
@@ -80,6 +169,37 @@ export default function EquipmentPermitsPage() {
     renewalDate: ''
   })
 
+  // Auto-check for overdue items and update reminders
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const today = new Date().toISOString().split('T')[0]
+      
+      setReminders(prev => prev.map(reminder => {
+        if (reminder.dueDate < today && reminder.status === 'pending') {
+          return { ...reminder, status: 'overdue' as 'overdue' }
+        }
+        return reminder
+      }))
+    }, 60000) // Check every minute
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // Log tracking action
+  const addTrackingLog = (type: 'equipment' | 'permit', itemId: number, itemName: string, action: string, details: string) => {
+    const newLog: TrackingLog = {
+      id: `t${Date.now()}`,
+      type,
+      itemId,
+      itemName,
+      action,
+      user: 'Admin User',
+      timestamp: new Date().toLocaleString(),
+      details
+    }
+    setTrackingLogs([newLog, ...trackingLogs])
+  }
+
   // Equipment Handlers
   const handleAddEquipment = () => {
     if (equipmentForm.name && equipmentForm.location) {
@@ -88,9 +208,11 @@ export default function EquipmentPermitsPage() {
         ...equipmentForm,
         cost: parseInt(equipmentForm.cost) || 0,
         quantity: parseInt(equipmentForm.quantity) || 1,
-        purchaseDate: new Date().toISOString().split('T')[0]
+        purchaseDate: new Date().toISOString().split('T')[0],
+        lastServiced: new Date().toISOString().split('T')[0]
       }
       setEquipment([...equipment, newEquipment])
+      addTrackingLog('equipment', newEquipment.id, newEquipment.name, 'Added', `New equipment added to inventory at ${newEquipment.location}`)
       setEquipmentForm({
         name: '',
         category: 'Cleaning',
@@ -107,11 +229,20 @@ export default function EquipmentPermitsPage() {
 
   const handleEditEquipment = () => {
     if (selectedEquipment && equipmentForm.name) {
+      const changes = []
+      if (selectedEquipment.status !== equipmentForm.status) changes.push(`status changed to ${equipmentForm.status}`)
+      if (selectedEquipment.location !== equipmentForm.location) changes.push(`location changed to ${equipmentForm.location}`)
+      
       setEquipment(equipment.map(e =>
         e.id === selectedEquipment.id
           ? { ...e, ...equipmentForm, cost: parseInt(equipmentForm.cost) || 0, quantity: parseInt(equipmentForm.quantity) || 1 }
           : e
       ))
+      
+      if (changes.length > 0) {
+        addTrackingLog('equipment', selectedEquipment.id, equipmentForm.name, 'Updated', `Equipment updated: ${changes.join(', ')}`)
+      }
+      
       setShowEditEquipmentModal(false)
       setSelectedEquipment(null)
       setEquipmentForm({
@@ -128,7 +259,39 @@ export default function EquipmentPermitsPage() {
   }
 
   const handleDeleteEquipment = (id: number) => {
+    const equip = equipment.find(e => e.id === id)
+    if (equip) {
+      addTrackingLog('equipment', id, equip.name, 'Deleted', `Equipment removed from inventory`)
+    }
     setEquipment(equipment.filter(e => e.id !== id))
+  }
+
+  // Reminder Handlers
+  const handleAddReminder = (reminderType: 'maintenance' | 'expiry' | 'renewal', dueDate: string, message: string) => {
+    if (selectedItemForReminder) {
+      const newReminder: Reminder = {
+        id: `r${Date.now()}`,
+        type: selectedItemForReminder.type,
+        itemId: selectedItemForReminder.id,
+        itemName: selectedItemForReminder.name,
+        reminderType,
+        dueDate,
+        status: 'pending',
+        message,
+        createdAt: new Date().toISOString().split('T')[0]
+      }
+      setReminders([...reminders, newReminder])
+      setShowReminderModal(false)
+      setSelectedItemForReminder(null)
+    }
+  }
+
+  const handleCompleteReminder = (id: string) => {
+    setReminders(reminders.map(r => r.id === id ? { ...r, status: 'completed' as 'completed' } : r))
+  }
+
+  const handleDeleteReminder = (id: string) => {
+    setReminders(reminders.filter(r => r.id !== id))
   }
 
   // Permit Handlers
@@ -140,6 +303,7 @@ export default function EquipmentPermitsPage() {
         cost: parseInt(permitForm.cost) || 0
       }
       setPermits([...permits, newPermit])
+      addTrackingLog('permit', newPermit.id, newPermit.name, 'Added', `New permit issued by ${newPermit.issuer}`)
       setPermitForm({
         name: '',
         category: 'Building',
@@ -156,11 +320,20 @@ export default function EquipmentPermitsPage() {
 
   const handleEditPermit = () => {
     if (selectedPermit && permitForm.name) {
+      const changes = []
+      if (selectedPermit.status !== permitForm.status) changes.push(`status changed to ${permitForm.status}`)
+      if (selectedPermit.expiryDate !== permitForm.expiryDate) changes.push(`expiry date updated to ${permitForm.expiryDate}`)
+      
       setPermits(permits.map(p =>
         p.id === selectedPermit.id
           ? { ...p, ...permitForm, cost: parseInt(permitForm.cost) || 0 }
           : p
       ))
+      
+      if (changes.length > 0) {
+        addTrackingLog('permit', selectedPermit.id, permitForm.name, 'Updated', `Permit updated: ${changes.join(', ')}`)
+      }
+      
       setShowEditPermitModal(false)
       setSelectedPermit(null)
       setPermitForm({
@@ -177,6 +350,10 @@ export default function EquipmentPermitsPage() {
   }
 
   const handleDeletePermit = (id: number) => {
+    const permit = permits.find(p => p.id === id)
+    if (permit) {
+      addTrackingLog('permit', id, permit.name, 'Deleted', `Permit removed from system`)
+    }
     setPermits(permits.filter(p => p.id !== id))
   }
 
@@ -321,15 +498,17 @@ export default function EquipmentPermitsPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex items-center gap-2 p-1 bg-white border border-gray-300 rounded-2xl w-fit">
+      <div className="flex items-center gap-2 p-1 bg-white border border-gray-300 rounded-2xl w-fit overflow-x-auto">
         {[
           { id: 'equipment', label: 'Equipment Inventory', icon: Wrench },
           { id: 'permits', label: 'Permits & Licenses', icon: ShieldCheck },
+          { id: 'reminders', label: 'Reminders', icon: Bell, badge: reminders.filter(r => r.status !== 'completed').length },
+          { id: 'tracking', label: 'Activity Tracking', icon: History },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all relative ${
               activeTab === tab.id
                 ? 'bg-indigo-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -337,6 +516,13 @@ export default function EquipmentPermitsPage() {
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
+            {tab.badge && tab.badge > 0 && (
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-black ${
+                activeTab === tab.id ? 'bg-white text-indigo-600' : 'bg-red-500 text-white'
+              }`}>
+                {tab.badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -425,6 +611,16 @@ export default function EquipmentPermitsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
                         <button
+                          onClick={() => {
+                            setSelectedItemForReminder({type: 'equipment', id: item.id, name: item.name})
+                            setShowReminderModal(true)
+                          }}
+                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                          title="Set Reminder"
+                        >
+                          <Bell className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => openEditEquipmentModal(item)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                         >
@@ -482,6 +678,16 @@ export default function EquipmentPermitsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
                         <button
+                          onClick={() => {
+                            setSelectedItemForReminder({type: 'permit', id: item.id, name: item.name})
+                            setShowReminderModal(true)
+                          }}
+                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                          title="Set Reminder"
+                        >
+                          <Bell className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => openEditPermitModal(item)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                         >
@@ -499,6 +705,241 @@ export default function EquipmentPermitsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Reminders Tab */}
+      {activeTab === 'reminders' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-gray-900">Active Reminders</h3>
+            <div className="flex gap-2">
+              <span className="px-3 py-1 bg-red-100 text-red-800 rounded-lg text-sm font-bold">
+                {reminders.filter(r => r.status === 'overdue').length} Overdue
+              </span>
+              <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-lg text-sm font-bold">
+                {reminders.filter(r => r.status === 'pending').length} Pending
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {reminders.filter(r => r.status !== 'completed').map((reminder) => (
+              <div key={reminder.id} className={`bg-white border-2 rounded-2xl p-6 ${
+                reminder.status === 'overdue' ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className={`px-3 py-1 rounded-lg text-xs font-black uppercase ${
+                        reminder.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                        reminder.status === 'pending' ? 'bg-amber-100 text-amber-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {reminder.status}
+                      </span>
+                      <span className={`px-3 py-1 rounded-lg text-xs font-black uppercase ${
+                        reminder.type === 'equipment' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                      }`}>
+                        {reminder.type}
+                      </span>
+                      <span className={`px-3 py-1 rounded-lg text-xs font-black uppercase ${
+                        reminder.reminderType === 'maintenance' ? 'bg-orange-100 text-orange-800' :
+                        reminder.reminderType === 'expiry' ? 'bg-red-100 text-red-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {reminder.reminderType}
+                      </span>
+                    </div>
+                    <h4 className="text-lg font-bold text-gray-900 mb-1">{reminder.itemName}</h4>
+                    <p className="text-sm text-gray-600 mb-3">{reminder.message}</p>
+                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        Due: {reminder.dueDate}
+                      </span>
+                      <span>Created: {reminder.createdAt}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleCompleteReminder(reminder.id)}
+                      className="p-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-all"
+                      title="Mark as Completed"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteReminder(reminder.id)}
+                      className="p-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-all"
+                      title="Delete Reminder"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {reminders.filter(r => r.status !== 'completed').length === 0 && (
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-12 text-center">
+                <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-medium">No active reminders</p>
+                <p className="text-gray-500 text-sm mt-1">All reminders are completed or no reminders set</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tracking Tab */}
+      {activeTab === 'tracking' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-gray-900">Activity Tracking Log</h3>
+            <span className="text-sm text-gray-600">{trackingLogs.length} total activities</span>
+          </div>
+
+          <div className="bg-white border border-gray-300 rounded-3xl overflow-hidden">
+            <div className="divide-y divide-gray-200">
+              {trackingLogs.map((log) => (
+                <div key={log.id} className="p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-xl ${
+                      log.action === 'Added' ? 'bg-green-100' :
+                      log.action === 'Updated' ? 'bg-blue-100' :
+                      log.action === 'Deleted' ? 'bg-red-100' :
+                      'bg-gray-100'
+                    }`}>
+                      {log.type === 'equipment' ? (
+                        <Wrench className="w-5 h-5 text-gray-700" />
+                      ) : (
+                        <ShieldCheck className="w-5 h-5 text-gray-700" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h4 className="text-base font-bold text-gray-900">{log.itemName}</h4>
+                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                          log.action === 'Added' ? 'bg-green-100 text-green-800' :
+                          log.action === 'Updated' ? 'bg-blue-100 text-blue-800' :
+                          log.action === 'Deleted' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {log.action}
+                        </span>
+                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                          log.type === 'equipment' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                        }`}>
+                          {log.type}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">{log.details}</p>
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {log.timestamp}
+                        </span>
+                        <span>By {log.user}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {trackingLogs.length === 0 && (
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-12 text-center">
+              <History className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 font-medium">No tracking logs yet</p>
+              <p className="text-gray-500 text-sm mt-1">Activity will be logged automatically</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reminder Modal */}
+      {showReminderModal && selectedItemForReminder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-lg w-full">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Set Reminder</h3>
+              <button
+                onClick={() => {
+                  setShowReminderModal(false)
+                  setSelectedItemForReminder(null)
+                }}
+                className="p-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <p className="text-sm font-bold text-blue-900">
+                  {selectedItemForReminder.type === 'equipment' ? 'Equipment' : 'Permit'}: {selectedItemForReminder.name}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Reminder Type</label>
+                <select
+                  id="reminderType"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="maintenance">Maintenance</option>
+                  <option value="expiry">Expiry</option>
+                  <option value="renewal">Renewal</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Due Date</label>
+                <input
+                  type="date"
+                  id="dueDate"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Message</label>
+                <textarea
+                  id="reminderMessage"
+                  rows={3}
+                  placeholder="Add reminder notes..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowReminderModal(false)
+                    setSelectedItemForReminder(null)
+                  }}
+                  className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const reminderType = (document.getElementById('reminderType') as HTMLSelectElement).value as any
+                    const dueDate = (document.getElementById('dueDate') as HTMLInputElement).value
+                    const message = (document.getElementById('reminderMessage') as HTMLTextAreaElement).value
+                    if (dueDate) {
+                      handleAddReminder(reminderType, dueDate, message || `${reminderType} reminder`)
+                    }
+                  }}
+                  className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                >
+                  Set Reminder
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

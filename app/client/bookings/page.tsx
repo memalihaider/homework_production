@@ -1,21 +1,54 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { 
   Calendar, 
   MapPin, 
   Clock, 
   AlertCircle,
   Edit2,
-  X,
+  Trash2,
   Check,
-  ChevronRight
+  ChevronRight,
+  Plus,
+  Filter,
+  Search,
+  Phone,
+  MessageSquare,
+  Star,
+  User,
+  X
 } from 'lucide-react'
+
+interface Booking {
+  id: string
+  service: string
+  date: string
+  time: string
+  status: 'Confirmed' | 'Scheduled' | 'Completed' | 'Cancelled' | 'Pending'
+  location: string
+  address: string
+  price: string
+  team: string
+  rating: number | null
+  notes?: string
+  contactPerson?: string
+  phone?: string
+  specialRequests?: string
+}
 
 export default function BookingHistory() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [rescheduleTime, setRescheduleTime] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [rescheduleForm, setRescheduleForm] = useState({ date: '', time: '' })
+  const [showRatingModal, setShowRatingModal] = useState(false)
+  const [ratingForm, setRatingForm] = useState({ bookingId: '', rating: 0, comment: '' })
+  const [showContactModal, setShowContactModal] = useState(false)
 
   const bookings = [
     { 
