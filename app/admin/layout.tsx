@@ -45,7 +45,8 @@ import {
   Lightbulb,
   Package,
   X,
-  ExternalLink
+  ExternalLink,
+  Sparkles
 } from 'lucide-react'
 
 type Notification = {
@@ -213,6 +214,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     { icon: Briefcase, label: 'Jobs', href: '/admin/jobs' },
     { icon: Wrench, label: 'Equipment & Permits', href: '/admin/equipment-permits' },
     { icon: TrendingUp, label: 'Job Profitability', href: '/admin/job-profitability' },
+    {
+      icon: Sparkles,
+      label: 'Booking System',
+      href: '/admin/services',
+      submenu: [
+        { label: 'Services', href: '/admin/services', icon: Sparkles },
+        { label: 'Bookings', href: '/admin/bookings', icon: Calendar },
+      ]
+    },
     {
       icon: UserCircle,
       label: 'HR Management',

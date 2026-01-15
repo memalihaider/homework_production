@@ -1,191 +1,241 @@
-import { 
-  Home, 
-  Building2, 
-  Sparkles, 
-  Wind, 
-  Droplets, 
-  ShieldCheck, 
+'use client'
+
+import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  Search,
+  Filter,
   ArrowRight,
-  CheckCircle2,
   Clock,
+  DollarSign,
+  Sparkles,
+  Wind,
+  Shield,
+  Lightbulb,
+  Hammer,
   Star,
-  Zap,
-  Heart
+  CheckCircle,
+  ChevronRight
 } from 'lucide-react'
-import Link from 'next/link'
+import { MOCK_SERVICES, Service } from '@/lib/bookings-services-data'
 
-const services = [
-  {
-    title: "Residential Cleaning",
-    description: "Comprehensive cleaning for your home, from apartments to villas. We ensure every corner sparkles.",
-    icon: Home,
-    features: ["Deep Cleaning", "Regular Maintenance", "Move-in/out Cleaning"],
-    image: "https://images.unsplash.com/photo-1581578731548-c64695cc6958?auto=format&fit=crop&q=80&w=800",
-    color: "bg-blue-50 text-blue-600"
-  },
-  {
-    title: "Commercial Cleaning",
-    description: "Professional cleaning solutions for offices, retail spaces, and commercial buildings.",
-    icon: Building2,
-    features: ["Office Cleaning", "Retail Spaces", "Industrial Cleaning"],
-    image: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=800",
-    color: "bg-purple-50 text-purple-600"
-  },
-  {
-    title: "Deep Cleaning",
-    description: "Intensive cleaning service targeting hidden dirt, allergens, and tough stains.",
-    icon: Sparkles,
-    features: ["Kitchen Sanitization", "Bathroom Deep Clean", "Floor Scrubbing"],
-    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&q=80&w=800",
-    color: "bg-pink-50 text-primary"
-  },
-  {
-    title: "AC Duct Cleaning",
-    description: "Improve air quality and efficiency with our professional AC duct cleaning services.",
-    icon: Wind,
-    features: ["Duct Inspection", "Dust Removal", "Sanitization"],
-    image: "https://images.unsplash.com/photo-1581094288338-2314dddb7ece?auto=format&fit=crop&q=80&w=800",
-    color: "bg-cyan-50 text-cyan-600"
-  },
-  {
-    title: "Upholstery Cleaning",
-    description: "Revitalize your sofas, carpets, and curtains with our specialized cleaning methods.",
-    icon: Droplets,
-    features: ["Sofa Cleaning", "Carpet Shampooing", "Curtain Steaming"],
-    image: "https://images.unsplash.com/photo-1550581190-9c1c48d21d6c?auto=format&fit=crop&q=80&w=800",
-    color: "bg-indigo-50 text-indigo-600"
-  },
-  {
-    title: "Disinfection Services",
-    description: "Keep your environment safe with our hospital-grade disinfection and sanitization.",
-    icon: ShieldCheck,
-    features: ["Virus Protection", "Surface Sanitization", "Fogging Service"],
-    image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=800",
-    color: "bg-green-50 text-green-600"
+const categoryIcons = {
+  cleaning: Sparkles,
+  maintenance: Wind,
+  inspection: Shield,
+  consultation: Lightbulb,
+  specialized: Hammer
+}
+
+const categoryColors = {
+  cleaning: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50',
+  maintenance: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900/50',
+  inspection: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900/50',
+  consultation: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50',
+  specialized: 'bg-pink-50 dark:bg-pink-950/30 border-pink-200 dark:border-pink-900/50'
+}
+
+const categoryAccentColors = {
+  cleaning: 'text-blue-600 dark:text-blue-400',
+  maintenance: 'text-green-600 dark:text-green-400',
+  inspection: 'text-purple-600 dark:text-purple-400',
+  consultation: 'text-amber-600 dark:text-amber-400',
+  specialized: 'text-pink-600 dark:text-pink-400'
+}
+
+export default function ServicesPage() {
+  const router = useRouter()
+  const [activeServices, setActiveServices] = useState<Service[]>(MOCK_SERVICES.filter(s => s.isActive))
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'duration'>('name')
+
+  const filteredAndSortedServices = useMemo(() => {
+    let filtered = activeServices.filter(service => {
+      const matchesSearch = 
+        service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        service.description.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      const matchesCategory = selectedCategory === 'all' || service.category === selectedCategory
+      
+      return matchesSearch && matchesCategory
+    })
+
+    // Sort services
+    if (sortBy === 'price') {
+      filtered.sort((a, b) => a.basePrice - b.basePrice)
+    } else if (sortBy === 'duration') {
+      filtered.sort((a, b) => a.duration - b.duration)
+    } else {
+      filtered.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    return filtered
+  }, [activeServices, searchTerm, selectedCategory, sortBy])
+
+  const categories = ['all', 'cleaning', 'maintenance', 'inspection', 'consultation', 'specialized']
+  const categoryLabels = {
+    all: 'All Services',
+    cleaning: 'Cleaning Services',
+    maintenance: 'Maintenance',
+    inspection: 'Inspection',
+    consultation: 'Consultation',
+    specialized: 'Specialized Services'
   }
-]
 
-export default function Services() {
+  const handleBookService = (serviceId: string) => {
+    router.push(`/booking?service=${serviceId}`)
+  }
+
   return (
-    <div className="flex flex-col">
-      {/* Hero Section */}
-      <section className="relative py-24 bg-slate-900 text-white overflow-hidden">
-        <div className="absolute inset-0 opacity-20">
-          <img 
-            src="https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&q=80&w=1600" 
-            alt="Our Services" 
-            className="w-full h-full object-cover"
-          />
-        </div>
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-8">Our <span className="text-primary">Services</span></h1>
-          <p className="text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
-            Professional hygiene solutions tailored to your needs. We bring excellence to every corner of your space.
+    {/* eslint-disable-next-line tailwindcss/no-contradicting-classname */}
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+      {/* Header */}
+      {/* eslint-disable-next-line tailwindcss/no-contradicting-classname */}
+      <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white py-12 px-4">
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-4xl md:text-5xl font-black mb-3">Our Services</h1>
+          <p className="text-lg text-blue-100 max-w-2xl">
+            Discover our comprehensive range of professional hygiene and cleaning solutions tailored to meet your needs
           </p>
         </div>
-      </section>
+      </div>
 
-      {/* Services Grid */}
-      <section className="py-24 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-8">
-            {services.map((service, index) => (
-              <div key={index} className="group bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden hover:shadow-2xl transition-all duration-500 flex flex-col">
-                <div className="relative h-64 overflow-hidden">
-                  <img 
-                    src={service.image} 
-                    alt={service.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
-                    <Link href="/book-service" className="w-full py-3 bg-primary text-white rounded-xl font-black text-center transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-                      Book Now
-                    </Link>
-                  </div>
-                </div>
-                <div className="p-10 flex-1 flex flex-col">
-                  <div className={`h-14 w-14 rounded-2xl ${service.color} flex items-center justify-center mb-6`}>
-                    <service.icon className="h-7 w-7" />
-                  </div>
-                  <h3 className="text-2xl font-black text-slate-900 mb-4">{service.title}</h3>
-                  <p className="text-slate-600 mb-8 leading-relaxed">{service.description}</p>
-                  <ul className="space-y-3 mb-8 mt-auto">
-                    {service.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-3 text-slate-700 font-bold text-sm">
-                        <CheckCircle2 className="h-4 w-4 text-primary" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link 
-                    href="/book-service" 
-                    className="flex items-center gap-2 text-primary font-black group/link"
-                  >
-                    Learn More <ArrowRight className="h-4 w-4 group-hover/link:translate-x-1 transition-transform" />
-                  </Link>
-                </div>
+      {/* Main Content */}
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        {/* Filters Section */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-lg mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Search */}
+            <div className="md:col-span-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search services..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-base focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                />
               </div>
+            </div>
+
+            {/* Sort */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-base focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            >
+              <option value="name">Sort by Name</option>
+              <option value="price">Sort by Price</option>
+              <option value="duration">Sort by Duration</option>
+            </select>
+          </div>
+
+          {/* Category Filters */}
+          <div className="mt-6 flex flex-wrap gap-2">
+            {categories.map(category => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-full font-bold text-sm transition-all ${
+                  selectedCategory === category
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {categoryLabels[category as keyof typeof categoryLabels]}
+              </button>
             ))}
           </div>
         </div>
-      </section>
 
-      {/* Process Section */}
-      <section className="py-24 bg-slate-50">
-        <div className="container mx-auto px-4">
-          <div className="text-center max-w-3xl mx-auto mb-20">
-            <h2 className="text-sm font-black text-primary uppercase tracking-[0.2em] mb-4">How It Works</h2>
-            <h3 className="text-4xl font-black text-slate-900 mb-6">Simple 3-Step Process</h3>
-            <p className="text-slate-600 text-lg">
-              Booking a professional cleaning service has never been easier.
+        {/* Services Grid */}
+        {filteredAndSortedServices.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {filteredAndSortedServices.map((service) => {
+              const IconComponent = categoryIcons[service.category]
+              return (
+                <div
+                  key={service.id}
+                  className={`group rounded-2xl border-2 overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 ${categoryColors[service.category]}`}
+                >
+                  {/* Header */}
+                  <div className="p-6 pb-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className={`h-12 w-12 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center shadow-md ${categoryAccentColors[service.category]}`}>
+                        <IconComponent className="h-6 w-6" />
+                      </div>
+                      <div className="flex items-center gap-1 text-amber-400">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="h-4 w-4 fill-current" />
+                        ))}
+                      </div>
+                    </div>
+
+                    <h3 className="text-xl font-black text-foreground mb-2">{service.name}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{service.description}</p>
+                  </div>
+
+                  {/* Features */}
+                  <div className="px-6 py-4 space-y-2 border-t border-current border-opacity-20">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        <span className="font-bold text-foreground">{service.duration}</span> hours
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        Starting from <span className="font-black text-foreground">AED {service.basePrice}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-6 py-4 bg-white/30 dark:bg-slate-800/30 backdrop-blur-sm">
+                    <button
+                      onClick={() => handleBookService(service.id)}
+                      className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${categoryAccentColors[service.category]} hover:shadow-lg shadow-md`}
+                    >
+                      Book Now
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center shadow-lg">
+            <Sparkles className="h-16 w-16 text-slate-300 dark:text-slate-700 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-foreground mb-2">No Services Found</h3>
+            <p className="text-muted-foreground">
+              Try adjusting your filters or search terms to find the service you're looking for
             </p>
           </div>
+        )}
 
-          <div className="grid md:grid-cols-3 gap-12 relative">
-            <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 -z-10"></div>
-            {[
-              { step: "01", title: "Book Online", desc: "Select your service and preferred time slot in seconds.", icon: Clock },
-              { step: "02", title: "We Clean", desc: "Our professional team arrives and performs the service.", icon: Zap },
-              { step: "03", title: "Enjoy", desc: "Relax and enjoy your fresh, clean environment.", icon: Heart }
-            ].map((item, i) => (
-              <div key={i} className="bg-white p-10 rounded-[2.5rem] border border-slate-100 text-center relative">
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 h-12 w-12 rounded-full bg-primary text-white flex items-center justify-center font-black text-lg shadow-xl">
-                  {item.step}
-                </div>
-                <div className="h-16 w-16 rounded-2xl bg-pink-50 flex items-center justify-center text-primary mx-auto mb-6 mt-4">
-                  <item.icon className="h-8 w-8" />
-                </div>
-                <h4 className="text-xl font-black text-slate-900 mb-4">{item.title}</h4>
-                <p className="text-slate-600">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-24 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="bg-slate-900 rounded-[3rem] p-12 md:p-20 text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 blur-[100px] rounded-full"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/20 blur-[100px] rounded-full"></div>
-            <div className="relative z-10 max-w-3xl mx-auto">
-              <h2 className="text-4xl md:text-5xl font-black text-white mb-8 leading-tight">Ready to Experience the <span className="text-primary">Homework UAE</span> Difference?</h2>
-              <p className="text-xl text-slate-300 mb-12">
-                Join thousands of satisfied customers across the UAE. Book your professional cleaning service today.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                <Link href="/book-service" className="px-10 py-5 bg-primary text-white rounded-2xl font-black text-lg hover:bg-pink-600 transition-all shadow-xl shadow-primary/20">
-                  Book Online Now
-                </Link>
-                <Link href="/contact" className="px-10 py-5 bg-white text-slate-900 rounded-2xl font-black text-lg hover:bg-slate-50 transition-all">
-                  Contact Us
-                </Link>
-              </div>
+        {/* Stats Section */}
+        {/* eslint-disable-next-line tailwindcss/no-contradicting-classname */}
+        <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-2xl p-8 mt-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div>
+              <p className="text-4xl font-black mb-2">{activeServices.length}+</p>
+              <p className="text-blue-100">Professional Services</p>
+            </div>
+            <div>
+              <p className="text-4xl font-black mb-2">100%</p>
+              <p className="text-blue-100">Satisfaction Guaranteed</p>
+            </div>
+            <div>
+              <p className="text-4xl font-black mb-2">24/7</p>
+              <p className="text-blue-100">Customer Support</p>
             </div>
           </div>
         </div>
-      </section>
+      </div>
     </div>
   )
 }
