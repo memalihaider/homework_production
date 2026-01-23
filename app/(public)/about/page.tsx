@@ -86,7 +86,7 @@ export default function About() {
                   ))}
                 </div>
                 <div className="text-sm font-black text-slate-400">
-                  JOINED BY <span className="text-slate-900">200+ EXPERTS</span>
+                  JOINED BY <span className="text-slate-900">250+ EXPERTS</span>
                 </div>
               </div>
             </motion.div>
@@ -130,7 +130,7 @@ export default function About() {
               <div>
                 <h3 className="text-3xl font-black text-slate-900 mb-4 tracking-tight uppercase">Our Vision</h3>
                 <p className="text-slate-500 text-lg leading-relaxed font-medium">
-                  To be the first choice to our employees, suppliers and customers in the region we operate, setting the gold standard for hygiene.
+                  To be the undisputed leader in hygiene and technical solutions, empowering residents and businesses with healthy, sparkling, and perfectly maintained environments.
                 </p>
               </div>
             </motion.div>
@@ -145,7 +145,7 @@ export default function About() {
               <div>
                 <h3 className="text-3xl font-black text-white mb-4 tracking-tight uppercase">Our Mission</h3>
                 <p className="text-slate-400 text-lg leading-relaxed font-medium">
-                  To provide reliable, flexible and consistent solution to our internal and external stakeholders in our hygiene business.
+                  To deliver consistent, flexible, and professional hygiene experiences through trained experts and advanced technical practices.
                 </p>
               </div>
             </motion.div>
@@ -168,10 +168,10 @@ export default function About() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
-              { title: "Honoring our words", desc: "We stick to our commitments and SLAs.", icon: ShieldCheck },
-              { title: "Reliability", desc: "Consistent results every single time.", icon: Zap },
-              { title: "Trust", desc: "Safe handling of your space and valuables.", icon: Heart },
-              { title: "Long-term approach", desc: "Building relationships, not just booking.", icon: Award }
+              { title: "Honoring Professional SLAs", desc: "We stick to our commitments and performance standards.", icon: ShieldCheck },
+              { title: "Reliability & Integrity", desc: "Consistent results and honest service every single time.", icon: Zap },
+              { title: "Customer-First Approach", desc: "Your satisfaction is the primary driver of our operations.", icon: Heart },
+              { title: "Excellence and Quality", desc: "Setting the gold standard in every hygiene session.", icon: Award }
             ].map((value, i) => (
               <motion.div
                 key={i}

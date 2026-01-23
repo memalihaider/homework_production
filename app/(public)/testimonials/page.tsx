@@ -5,21 +5,21 @@ import { Star, Quote, User } from 'lucide-react'
 
 const testimonials = [
   {
-    name: "Mr. Riaz",
-    role: "Food Outlet Owner, Dubai",
-    content: "We recently switched from an old cleaning company to Homework. Despite recurring spills and stains in food outlets, they were efficient at their work and managed to eliminate even the most stubborn blemishes that left me truly delighted. I am glad to recommend them to others as well.",
+    name: "Fatima Al Suwaidi",
+    role: "Villa Owner, Jumeirah",
+    content: "The attention to detail in their deep cleaning service is unmatched. My villa has never felt so fresh!",
     rating: 5
   },
   {
-    name: "Roza Khan",
-    role: "Resident, Abu Dhabi",
-    content: "Highly skilled home cleaners brought in the latest equipment for cleaning our badly stained curtains. Within a matter of hours, the curtains looked as good as new. They were professional and gave a completely brilliant clean service - Highly recommended! Thank you!",
+    name: "David Wilson",
+    role: "Resident, TechHub Dubai",
+    content: "Excellent technical service! Their AC maintenance team was professional, punctual, and very thorough.",
     rating: 5
   },
   {
-    name: "Mrs. Ema Henrick",
-    role: "Townhouse Owner",
-    content: "Having lived in the townhouse for decades, dust and cobwebs accumulated in areas with limited access. The kitchen sinks, hoods and exhausts had layers of grease. I roped in Homework for the cleaning service. The team was flexible when setting the schedule, plus they did a fabulous job. I was so elated that I right away referred them to my neighbors.",
+    name: "Mariam Rashid",
+    role: "Resident, Marina",
+    content: "The weekly normal cleaning keeps my apartment in perfect condition. Highly recommended hygiene partner!",
     rating: 5
   },
   {

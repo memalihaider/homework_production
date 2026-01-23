@@ -1,16 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 
 export default function CustomCursor() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [isHovering, setIsHovering] = useState(false)
   const [isClicking, setIsClicking] = useState(false)
+  const throttleRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const mouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
+      // Throttle mouse move events for better performance
+      if (throttleRef.current) clearTimeout(throttleRef.current)
+      throttleRef.current = setTimeout(() => {
+        setMousePosition({ x: e.clientX, y: e.clientY })
+      }, 8) // ~60fps with throttling
     }
 
     const handleMouseOver = (e: MouseEvent) => {
@@ -39,13 +44,14 @@ export default function CustomCursor() {
       setIsClicking(false)
     }
 
-    window.addEventListener('mousemove', mouseMove)
-    document.addEventListener('mouseover', handleMouseOver)
-    document.addEventListener('mouseout', handleMouseOut)
-    window.addEventListener('mousedown', handleMouseDown)
-    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('mousemove', mouseMove, { passive: true })
+    document.addEventListener('mouseover', handleMouseOver, { passive: true })
+    document.addEventListener('mouseout', handleMouseOut, { passive: true })
+    window.addEventListener('mousedown', handleMouseDown, { passive: true })
+    window.addEventListener('mouseup', handleMouseUp, { passive: true })
 
     return () => {
+      if (throttleRef.current) clearTimeout(throttleRef.current)
       window.removeEventListener('mousemove', mouseMove)
       document.removeEventListener('mouseover', handleMouseOver)
       document.removeEventListener('mouseout', handleMouseOut)

@@ -31,8 +31,8 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      {/* Main Navbar */}
-      <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-backdrop-filter:bg-white/60 shadow-sm">
+      {/* Main Navbar - Optimized */}
+      <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-sm supports-backdrop-filter:bg-white/60 shadow-sm">
         <div className="container mx-auto flex h-20 items-center justify-between px-4">
           <a href="/" className="flex items-center gap-2 group">
             <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">H</div>
@@ -57,7 +57,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                   <div>
                     <h4 className="text-[11px] font-black text-primary uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
                       <span className="h-1 w-6 bg-primary rounded-full" />
-                      Normal
+                      Normal Cleaning
                     </h4>
                     <div className="grid gap-1">
                       {[
@@ -124,7 +124,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                   <div>
                     <h4 className="text-[11px] font-black text-primary uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
                       <span className="h-1 w-6 bg-primary rounded-full" />
-                      Technical
+                      Technical Cleaning
                     </h4>
                     <div className="grid grid-cols-1 gap-1">
                       {[
@@ -220,7 +220,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                   <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0 shadow-lg">
                     <MapPin className="h-4 w-4" />
                   </div>
-                  <span className="group-hover:text-white transition-colors">Al Quoz- Dubai - United Arab Emirates</span>
+                  <span className="group-hover:text-white transition-colors uppercase leading-relaxed font-bold text-[11px] tracking-tight">Office: 201, 2nd Floor, Al Saaha Offices - B, Downtown Dubai - UAE</span>
                 </li>
                 <li className="flex items-start gap-4 group cursor-pointer">
                    <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0 shadow-lg">

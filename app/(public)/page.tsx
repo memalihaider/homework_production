@@ -2,7 +2,11 @@
 
 import { CheckCircle2, ArrowRight, Star, Shield, Clock, Users, Award, Leaf, Sparkles, ShieldCheck, Zap } from 'lucide-react'
 import { motion, useTransform, useMotionValue, useSpring, useScroll } from 'framer-motion'
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useMemo } from 'react'
+import dynamic from 'next/dynamic'
+
+// Lazy load heavy components
+const CustomCursor = dynamic(() => import('@/components/CustomCursor').then(mod => ({ default: mod.default })), { ssr: false })
 
 export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -58,10 +62,10 @@ export default function Home() {
         }}
       />
 
-      {/* Floating Interactive Geometric Shapes */}
+      {/* Floating Interactive Geometric Shapes - Optimized */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <motion.div 
-          style={{ x: blobParallaxX, y: blobParallaxY, rotate: 45 }}
+          style={{ x: blobParallaxX, y: blobParallaxY }}
           className="absolute top-[15%] left-[5%] w-64 h-64 bg-primary/3 rounded-[40%] blur-3xl"
         />
         <motion.div 
@@ -99,7 +103,7 @@ export default function Home() {
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
               <Sparkles className="h-4 w-4 text-pink-500 animate-pulse" />
-              <span className="uppercase tracking-widest">Premium Hygiene Solutions in UAE</span>
+              <span className="uppercase tracking-widest">PREMIUM HYGIENE & TECHNICAL SOLUTIONS IN UAE</span>
             </motion.div>
 
             <motion.h1 
@@ -108,9 +112,9 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             >
-              CLEANING <br />
+              ELEVATING <br />
               <span className="text-primary relative">
-                EXCELLENCE
+                HYGIENE
                 <motion.span 
                   className="absolute -bottom-2 left-0 h-2 bg-pink-100 -z-10"
                   initial={{ width: 0 }}
@@ -119,7 +123,7 @@ export default function Home() {
                 />
               </span>
               <br />
-              FOR YOUR HOME
+              STANDARDS
             </motion.h1>
 
             <motion.p 
@@ -128,7 +132,7 @@ export default function Home() {
               animate={{ opacity: 1 }}
               transition={{ duration: 1, delay: 0.5 }}
             >
-              Experience the UAE's most trusted hygiene partner. We deliver meticulously detailed cleaning services tailored for modern living.
+              Experience the UAE's most trusted hygiene and technical partner. We deliver meticulously detailed services tailored for modern living.
             </motion.p>
             
             <motion.div 
@@ -158,15 +162,15 @@ export default function Home() {
           </motion.div>
         </div>
 
-        {/* Floating background elements */}
+        {/* Floating background elements - Optimized */}
         <motion.div 
-          className="absolute right-[10%] top-[20%] w-64 h-64 bg-primary/5 rounded-full blur-3xl"
+          className="absolute right-[10%] top-[20%] w-64 h-64 bg-primary/5 rounded-full blur-2xl"
           animate={{ 
-            scale: [1, 1.2, 1],
-            x: [0, 50, 0],
-            y: [0, -30, 0]
+            scale: [1, 1.15, 1],
+            x: [0, 40, 0],
+            y: [0, -25, 0]
           }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
         />
       </section>
 
@@ -175,9 +179,9 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
             {[
-              { label: "Happy Clients Across UAE", value: "12,000+", icon: Users },
-              { label: "Hygiene Sessions Completed", value: "35,000+", icon: Sparkles },
-              { label: "Certified Expert Staff", value: "200+", icon: ShieldCheck },
+              { label: "Happy Clients Across UAE", value: "18,000+", icon: Users },
+              { label: "Hygiene Sessions Completed", value: "45,000+", icon: Sparkles },
+              { label: "Certified Expert Staff", value: "250+", icon: ShieldCheck },
               { label: "Emirates Covered", value: "7", icon: Award },
             ].map((stat, i) => (
               <motion.div 
@@ -221,7 +225,7 @@ export default function Home() {
               </div>
               <h3 className="text-3xl font-black mb-6 text-slate-900 leading-tight">Our Vision</h3>
               <p className="text-slate-500 leading-relaxed font-medium">
-                To be the undisputed leader in hygiene solutions, empowering residents and businesses with healthy, sparkling environments.
+                To be the undisputed leader in hygiene and technical solutions, empowering residents and businesses with healthy, sparkling, and perfectly maintained environments.
               </p>
             </motion.div>
             
@@ -234,7 +238,7 @@ export default function Home() {
               </div>
               <h3 className="text-3xl font-black mb-6 leading-tight">Our Mission</h3>
               <p className="text-slate-400 leading-relaxed font-medium">
-                To deliver consistent, flexible, and professional cleaning experiences through trained experts and eco-friendly practices.
+                To deliver consistent, flexible, and professional hygiene experiences through trained experts and advanced technical practices.
               </p>
             </motion.div>
 
@@ -248,10 +252,10 @@ export default function Home() {
               <h3 className="text-3xl font-black mb-6 text-slate-900 leading-tight">Core Values</h3>
               <ul className="space-y-4">
                 {[
-                  "Honoring Professional SlAs",
+                  "Honoring Professional SLAs",
                   "Deep Reliability & Integrity",
                   "Customer-First Approach",
-                  "Sustainable Green Cleaning"
+                  "Excellence and Quality"
                 ].map((val, i) => (
                   <li key={i} className="flex items-center gap-3 font-bold text-slate-700">
                     <div className="h-2 w-2 rounded-full bg-primary" /> {val}
@@ -297,20 +301,20 @@ export default function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
             {[
               {
-                title: "Residential Hygiene",
-                description: "Deep-clean protocols designed for high-end UAE residences.",
+                title: "Normal Cleaning",
+                description: "Professional hourly cleaning services for homes and offices. Our trained staff ensures your space remains spotless and welcoming.",
                 image: "https://images.unsplash.com/photo-1581578731548-c64695cc6958?auto=format&fit=crop&q=80&w=800",
                 tag: "Bestseller"
               },
               {
-                title: "Villa Rejuvenation",
-                description: "Complete interior and exterior sanitization for spacious villas.",
+                title: "Deep Cleaning",
+                description: "Comprehensive intensive cleaning for move-ins, move-outs, or seasonal refreshes. We reach every corner using medical-grade equipment.",
                 image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=800",
                 tag: "Exclusive"
               },
               {
-                title: "Technical Ducting",
-                description: "Advanced AC duct cleaning and sterilization for peak performance.",
+                title: "Technical Cleaning",
+                description: "Specialized maintenance including AC cleaning, plumbing, and electrical services to keep your infrastructure running perfectly.",
                 image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&q=80&w=800",
                 tag: "Specialist"
               },
@@ -335,7 +339,8 @@ export default function Home() {
             ].map((service, i) => (
               <motion.div 
                 key={i} 
-                className="group relative h-125 rounded-[3rem] overflow-hidden shadow-2xl shadow-slate-100 cursor-none"
+                className="group relative h-125 rounded-[3rem] overflow-hidden shadow-2xl shadow-slate-100 cursor-none animate-hanging"
+                style={{ animationDelay: `${i * 0.15}s` }}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
@@ -497,27 +502,28 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
             {[
               {
-                name: "Amna Al Maktoum",
+                name: "Fatima Al Suwaidi",
                 role: "Villa Owner, Jumeirah",
                 image: "https://randomuser.me/api/portraits/women/68.jpg",
-                text: "The post-renovation cleaning was flawless. They handled our delicate interiors with extreme care and left no trace of dust."
+                text: "The attention to detail in their deep cleaning service is unmatched. My villa has never felt so fresh!"
               },
               {
-                name: "David Sterling",
-                role: "CEO, TechHub Dubai",
+                name: "David Wilson",
+                role: "Resident, TechHub Dubai",
                 image: "https://randomuser.me/api/portraits/men/75.jpg",
-                text: "Consistency is key for our office hygiene. Homework UAE has been our partner for 3 years, and their standards never slip."
+                text: "Excellent technical service! Their AC maintenance team was professional, punctual, and very thorough."
               },
               {
-                name: "Fatima Ahmad",
+                name: "Mariam Rashid",
                 role: "Resident, Marina",
                 image: "https://randomuser.me/api/portraits/women/88.jpg",
-                text: "Same-day booking for AC duct cleaning saved us. Professional, quick, and the air quality improvement was immediate."
+                text: "The weekly normal cleaning keeps my apartment in perfect condition. Highly recommended hygiene partner!"
               }
             ].map((testimonial, i) => (
               <motion.div 
                 key={i} 
-                className="bg-slate-50 p-12 rounded-[3rem] relative border border-slate-100/50 hover:bg-white hover:shadow-3xl hover:shadow-slate-200 transition-all duration-500"
+                className="bg-slate-50 p-12 rounded-[3rem] relative border border-slate-100/50 hover:bg-white hover:shadow-3xl hover:shadow-slate-200 transition-all duration-500 animate-hanging"
+                style={{ animationDelay: `${i * 0.2}s` }}
                 whileHover={{ y: -15 }}
               >
                 <div className="flex text-pink-500 mb-8 gap-1">
@@ -551,7 +557,7 @@ export default function Home() {
                 <span className="italic">GOLD STANDARD</span>
               </h2>
               <p className="text-xl text-white/80 font-medium max-w-2xl mx-auto">
-                Join 12,000+ satisfied clients across the UAE. Your journey to a healthier, cleaner environment begins with a single click.
+                Join 18,000+ satisfied clients across the UAE. Your journey to a healthier, cleaner environment begins with a single click.
               </p>
               <div className="flex flex-wrap justify-center gap-6">
                 <motion.a 
@@ -573,9 +579,9 @@ export default function Home() {
               </div>
             </div>
             
-            {/* Decorative circles */}
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl animate-pulse" />
-            <div className="absolute -bottom-10 -left-10 w-60 h-60 bg-pink-300/20 rounded-full blur-3xl animate-pulse delay-700" />
+            {/* Decorative circles - Optimized */}
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-2xl animate-pulse" />
+            <div className="absolute -bottom-10 -left-10 w-60 h-60 bg-pink-300/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.7s' }} />
           </motion.div>
         </div>
       </section>
