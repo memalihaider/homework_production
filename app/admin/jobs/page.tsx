@@ -22,9 +22,12 @@ import {
   Edit,
   Zap,
   AlertTriangle,
-  Check
+  Check,
+  TrendingUp
 } from 'lucide-react'
 import Link from 'next/link'
+import NewJobForm from './components/NewJobForm'
+import { MOCK_ATTENDANCE, Attendance } from '@/lib/hr-data'
 
 interface Job {
   id: number
@@ -263,6 +266,8 @@ export default function JobsPage() {
   const [executionChecklist, setExecutionChecklist] = useState<string[]>([])
   const [executionNotes, setExecutionNotes] = useState('')
   const [editingJobId, setEditingJobId] = useState<number | null>(null)
+  const [showNewJobForm, setShowNewJobForm] = useState(false)
+  const [attendance] = useState<Attendance[]>(MOCK_ATTENDANCE)
 
   const [newJobForm, setNewJobForm] = useState<NewJobForm>({
     title: '',
@@ -298,6 +303,17 @@ export default function JobsPage() {
     totalActualCost: jobs.reduce((sum, j) => sum + j.actualCost, 0),
     critical: jobs.filter(j => j.priority === 'Critical').length
   }), [jobs])
+
+  // Get team attendance for a job
+  const getTeamAttendance = (jobTitle: string) => {
+    return attendance.filter(a => a.jobTitle === jobTitle && a.status === 'On Job')
+  }
+
+  // Get employee status on a job
+  const getEmployeeStatus = (name: string) => {
+    const record = attendance.find(a => a.employeeName === name)
+    return record ? { status: record.status, clockIn: record.clockIn, clockOut: record.clockOut } : null
+  }
 
   // Filter jobs
   const filteredJobs = useMemo(() => {
@@ -515,6 +531,60 @@ export default function JobsPage() {
     setShowExecutionModal(false)
   }
 
+  const handleSaveNewJob = useCallback((jobData: any) => {
+    try {
+      // Validate required fields
+      if (!jobData.title || !jobData.client || !jobData.location) {
+        alert('Please fill in all required fields: Title, Client, and Location')
+        return
+      }
+
+      // Create new job with unique ID
+      const newJobId = Math.max(...jobs.map(j => j.id), 0) + 1
+      const newJob: Job = {
+        id: newJobId,
+        title: jobData.title,
+        client: jobData.client,
+        clientId: jobData.clientId || 0,
+        description: jobData.description || '',
+        status: 'Pending',
+        priority: (jobData.priority || 'Medium') as Job['priority'],
+        location: jobData.location,
+        scheduledDate: jobData.scheduledDate || null,
+        scheduledTime: jobData.scheduledTime || '09:00',
+        endTime: jobData.endTime || '17:00',
+        estimatedDuration: jobData.estimatedDuration || '8',
+        slaDeadline: jobData.slaDeadline || '',
+        riskLevel: (jobData.riskLevel || 'Low') as Job['riskLevel'],
+        teamRequired: jobData.teamRequired || 1,
+        budget: jobData.budget || 0,
+        actualCost: 0,
+        requiredSkills: jobData.requiredSkills || [],
+        permits: jobData.permits || [],
+        tags: jobData.tags || [],
+        specialInstructions: jobData.specialInstructions || '',
+        services: jobData.services || [],
+        recurring: jobData.recurring || false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        executionLogs: [],
+        assignedTo: [],
+        reminderEnabled: false
+      }
+
+      // Add new job to jobs array
+      setJobs([...jobs, newJob])
+      
+      // Close form
+      setShowNewJobForm(false)
+      
+      alert(`Job "${newJob.title}" created successfully`)
+    } catch (error) {
+      console.error('Error creating job:', error)
+      alert('Error creating job. Please try again.')
+    }
+  }, [jobs])
+
   return (
     <div className="space-y-6 pb-8">
       {/* Header */}
@@ -616,7 +686,7 @@ export default function JobsPage() {
             </select>
 
             <button
-              onClick={handleAddJob}
+              onClick={() => setShowNewJobForm(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -678,6 +748,35 @@ export default function JobsPage() {
 
                       {job.description && (
                         <p className="text-sm text-gray-600 line-clamp-2">{job.description}</p>
+                      )}
+
+                      {/* Team Attendance Status */}
+                      {(job.status === 'In Progress' || job.status === 'Scheduled') && job.assignedTo.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <p className="text-xs text-gray-600 font-semibold mb-2 flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3" />
+                            Team Status
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {job.assignedTo.map((member, idx) => {
+                              const empStatus = getEmployeeStatus(member)
+                              return (
+                                <span
+                                  key={idx}
+                                  className={`text-xs px-2 py-1 rounded-full border font-medium ${
+                                    empStatus?.status === 'On Job'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : empStatus?.status === 'Present'
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : 'bg-gray-50 text-gray-700 border-gray-200'
+                                  }`}
+                                >
+                                  {member} {empStatus?.status === 'On Job' ? '✓' : ''}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </Link>
@@ -1308,6 +1407,14 @@ export default function JobsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* New Job Form Modal */}
+      {showNewJobForm && (
+        <NewJobForm
+          onClose={() => setShowNewJobForm(false)}
+          onSave={handleSaveNewJob}
+        />
       )}
     </div>
   )

@@ -186,16 +186,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         { label: 'Clients', href: '/admin/crm/clients', icon: UserCheck },
       ]
     },
-    {
-      icon: Ruler,
-      label: 'Surveys',
-      href: '/admin/surveys',
-      submenu: [
-        { label: 'Assignment', href: '/admin/surveys', icon: Map },
-        { label: 'Form', href: '/admin/surveys/form', icon: FileText },
-        { label: 'Pricing', href: '/admin/surveys/pricing', icon: DollarSign },
-      ]
-    },
+    { icon: Ruler, label: 'Surveys', href: '/admin/surveys' },
     {
       icon: FileText,
       label: 'Quotations',
@@ -203,13 +194,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     },
     {
       icon: Wrench,
-      label: 'Product Management',
-      href: '/admin/services',
-      submenu: [
-        { label: 'Categories', href: '/admin/products/categories', icon: Archive },
-        { label: 'Services', href: '/admin/services', icon: Zap },
-        { label: 'Products', href: '/admin/products/products', icon: Package },
-      ]
+      label: 'Inventory & Services',
+      href: '/admin/products',
     },
     { icon: Briefcase, label: 'Jobs', href: '/admin/jobs' },
     { icon: Wrench, label: 'Equipment & Permits', href: '/admin/equipment-permits' },
@@ -244,9 +230,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       label: 'Finance',
       href: '/admin/finance',
       submenu: [
-        { label: 'Invoice Generator', href: '/admin/finance/invoice-generator', icon: FileText },
-        { label: 'Payment Tracker', href: '/admin/finance/payment-tracker', icon: CreditCard },
-        { label: 'Finance Center', href: '/admin/finance/finance-reports', icon: BarChartIcon },
+        { label: 'Dashboard', href: '/admin/finance', icon: DollarSign },
       ]
     },
     { icon: TrendingUp, label: 'Marketing', href: '/admin/marketing' },

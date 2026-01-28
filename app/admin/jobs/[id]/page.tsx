@@ -56,6 +56,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import JobEditSidebar from '../components/JobEditSidebar'
 
 function JobDetailContent() {
   const params = useParams()
@@ -398,6 +399,23 @@ function JobDetailContent() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900 p-6 space-y-8">
+      {/* Edit Sidebar */}
+      {isEditing && (
+        <>
+          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setIsEditing(false)} />
+          <JobEditSidebar 
+            jobId={jobId}
+            onClose={() => setIsEditing(false)}
+            onSave={(jobData) => {
+              // Handle job data save
+              console.log('Job updated:', jobData)
+              addActivityLog('Job Updated', 'Job details modified')
+              setIsEditing(false)
+            }}
+          />
+        </>
+      )}
+
       {/* Enhanced Header with Real-time Status */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-4">

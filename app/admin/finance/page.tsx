@@ -1,426 +1,918 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { TrendingUp, DollarSign, CreditCard, Eye, Plus, X, ArrowUpRight, ArrowDownRight, FileText, BarChart3, Users, Wallet } from 'lucide-react'
-import Link from 'next/link'
+import { useState, useMemo } from 'react'
+import {
+  DollarSign,
+  Plus,
+  Search,
+  Filter,
+  Eye,
+  Edit2,
+  Trash2,
+  X,
+  Download,
+  Send,
+  CheckCircle,
+  AlertCircle,
+  TrendingUp,
+  Users,
+  FileText,
+  CreditCard,
+  Clock,
+  Calendar,
+  Printer,
+  Mail,
+  ChevronDown,
+  Building2,
+  Phone,
+  MapPin,
+  User,
+  BarChart3,
+  PieChart,
+  ArrowUp,
+  ArrowDown
+} from 'lucide-react'
+import { MOCK_CLIENTS, MOCK_INVOICES, MOCK_PAYMENTS, MOCK_EXPENSES, calculateFinancialSummary, Client, Invoice, Payment, Expense } from '@/lib/finance-data'
 
-interface Invoice {
-  id: number
-  invoiceNumber: string
-  client: string
-  amount: number
-  status: 'Pending' | 'Paid' | 'Overdue'
-  dueDate: string
-  issuedDate: string
-}
+export default function UnifiedFinancePage() {
+  const [invoices, setInvoices] = useState<Invoice[]>(MOCK_INVOICES)
+  const [payments, setPayments] = useState<Payment[]>(MOCK_PAYMENTS)
+  const [expenses, setExpenses] = useState<Expense[]>(MOCK_EXPENSES)
+  const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS)
 
-interface Expense {
-  id: number
-  description: string
-  category: string
-  amount: number
-  date: string
-  paymentMethod: string
-}
+  const [activeTab, setActiveTab] = useState('overview')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
 
-export default function Finance() {
-  const [activeTab, setActiveTab] = useState<'invoices' | 'expenses'>('invoices')
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showDetails, setShowDetails] = useState(false)
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [showClientModal, setShowClientModal] = useState(false)
+  const [showExpenseModal, setShowExpenseModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
 
-  const [invoices, setInvoices] = useState<Invoice[]>([
-    { id: 1, invoiceNumber: '#INV-001', client: 'Ahmed Al-Mansoori', amount: 2500, status: 'Paid', dueDate: '2025-12-25', issuedDate: '2025-12-15' },
-    { id: 2, invoiceNumber: '#INV-002', client: 'Business Corp', amount: 8500, status: 'Pending', dueDate: '2025-12-28', issuedDate: '2025-12-18' },
-    { id: 3, invoiceNumber: '#INV-003', client: 'Fatima Al-Zahra', amount: 1800, status: 'Overdue', dueDate: '2025-12-10', issuedDate: '2025-12-01' }
-  ])
+  const [newInvoice, setNewInvoice] = useState({
+    clientId: '',
+    lineItems: [{ description: '', quantity: 1, unitPrice: 0, unit: 'service' }],
+    notes: '',
+    paymentTerms: '30 days',
+    dueDate: '',
+    attachments: [] as { name: string; size: string; type: string }[]
+  })
 
-  const [expenses, setExpenses] = useState<Expense[]>([
-    { id: 1, description: 'Cleaning Supplies', category: 'Supplies', amount: 850, date: '2025-12-20', paymentMethod: 'Credit Card' },
-    { id: 2, description: 'Vehicle Fuel', category: 'Transportation', amount: 450, date: '2025-12-19', paymentMethod: 'Debit Card' },
-    { id: 3, description: 'Staff Salaries', category: 'Payroll', amount: 45000, date: '2025-12-15', paymentMethod: 'Bank Transfer' }
-  ])
+  const [newClient, setNewClient] = useState({
+    name: '',
+    company: '',
+    email: '',
+    phone: '',
+    location: '',
+    notes: ''
+  })
 
-  const [newInvoice, setNewInvoice] = useState({ client: '', amount: '', dueDate: '' })
+  const [newExpense, setNewExpense] = useState({
+    description: '',
+    category: 'Supplies',
+    amount: 0,
+    vendor: '',
+    notes: ''
+  })
 
-  const totalIncome = invoices.reduce((sum, inv) => sum + inv.amount, 0)
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0)
-  const profit = totalIncome - totalExpenses
-  const debtorsCount = 4 // This would come from actual debtors data
+  const [newPayment, setNewPayment] = useState({
+    invoiceId: '',
+    amount: 0,
+    paymentMethod: 'Bank Transfer',
+    transactionRef: '',
+    attachments: [] as { name: string; size: string; type: string }[]
+  })
 
-  const handleAddInvoice = useCallback(() => {
-    if (newInvoice.client && newInvoice.amount) {
-      const invoice: Invoice = {
-        id: Math.max(...invoices.map(i => i.id), 0) + 1,
-        invoiceNumber: `#INV-${String(invoices.length + 1).padStart(3, '0')}`,
-        client: newInvoice.client,
-        amount: Number(newInvoice.amount),
-        status: 'Pending',
-        dueDate: newInvoice.dueDate,
-        issuedDate: new Date().toISOString().split('T')[0]
-      }
-      setInvoices([...invoices, invoice])
-      setNewInvoice({ client: '', amount: '', dueDate: '' })
-      setShowAddModal(false)
-      alert(`✓ Invoice ${invoice.invoiceNumber} created!`)
+  // Calculate financial summary
+  const summary = useMemo(() => calculateFinancialSummary(invoices, payments, expenses), [invoices, payments, expenses])
+
+  // Filter invoices
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter(inv => {
+      const matchesSearch = inv.invoiceNumber.includes(searchTerm) || inv.clientName.includes(searchTerm)
+      const matchesStatus = filterStatus === 'all' || inv.status === filterStatus
+      return matchesSearch && matchesStatus
+    })
+  }, [invoices, searchTerm, filterStatus])
+
+  // Filter clients
+  const filteredClients = useMemo(() => {
+    return clients.filter(client =>
+      client.name.includes(searchTerm) || client.company.includes(searchTerm)
+    )
+  }, [clients, searchTerm])
+
+  // Filter expenses
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter(exp =>
+      exp.description.includes(searchTerm) || exp.category.includes(searchTerm)
+    )
+  }, [expenses, searchTerm])
+
+  const handleAddInvoice = () => {
+    if (!newInvoice.clientId || newInvoice.lineItems.length === 0 || !newInvoice.dueDate) {
+      alert('Please fill all required fields')
+      return
     }
-  }, [newInvoice, invoices])
 
-  const handleStatusChange = useCallback((id: number, newStatus: string) => {
-    setInvoices(invoices.map(i =>
-      i.id === id ? { ...i, status: newStatus as any } : i
-    ))
-    alert(`✓ Invoice status updated to "${newStatus}"`)
-  }, [invoices])
+    const subtotal = newInvoice.lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
+    const tax = subtotal * 0.10
+    const total = subtotal + tax
 
-  const handleMarkPaid = useCallback((id: number) => {
-    setInvoices(invoices.map(i =>
-      i.id === id ? { ...i, status: 'Paid' as const } : i
-    ))
-    alert(`✓ Invoice marked as Paid`)
-  }, [invoices])
+    const invoice: Invoice = {
+      id: `INV${Date.now()}`,
+      invoiceNumber: `INV-2026-${String(invoices.length + 1).padStart(3, '0')}`,
+      clientId: newInvoice.clientId,
+      clientName: clients.find(c => c.id === newInvoice.clientId)?.name || '',
+      clientEmail: clients.find(c => c.id === newInvoice.clientId)?.email,
+      invoiceDate: new Date().toISOString().split('T')[0],
+      dueDate: newInvoice.dueDate,
+      status: 'Sent',
+      lineItems: newInvoice.lineItems.map((item, idx) => ({
+        id: `LI${Date.now()}${idx}`,
+        ...item,
+        amount: item.quantity * item.unitPrice
+      })),
+      subtotal,
+      tax,
+      taxRate: 0.10,
+      total,
+      notes: newInvoice.notes,
+      paymentTerms: newInvoice.paymentTerms,
+      currencyCode: 'AED',
+      sentDate: new Date().toISOString().split('T')[0],
+      createdBy: 'Admin',
+      updatedAt: new Date().toISOString().split('T')[0]
+    }
+
+    setInvoices([...invoices, invoice])
+    setNewInvoice({ clientId: '', lineItems: [{ description: '', quantity: 1, unitPrice: 0, unit: 'service' }], notes: '', paymentTerms: '30 days', dueDate: '', attachments: [] })
+    setShowInvoiceModal(false)
+    alert('Invoice created successfully!')
+  }
+
+  const handleAddClient = () => {
+    if (!newClient.name || !newClient.email) {
+      alert('Please fill required fields')
+      return
+    }
+
+    const client: Client = {
+      id: `CLI${Date.now()}`,
+      name: newClient.name,
+      company: newClient.company,
+      email: newClient.email,
+      phone: newClient.phone,
+      location: newClient.location,
+      joinDate: new Date().toISOString().split('T')[0],
+      totalSpent: 0,
+      projects: 0,
+      lastService: '',
+      status: 'Active',
+      tier: 'Bronze',
+      notes: newClient.notes
+    }
+
+    setClients([...clients, client])
+    setNewClient({ name: '', company: '', email: '', phone: '', location: '', notes: '' })
+    setShowClientModal(false)
+    alert('Client added successfully!')
+  }
+
+  const handleAddExpense = () => {
+    if (!newExpense.description || !newExpense.amount) {
+      alert('Please fill required fields')
+      return
+    }
+
+    const expense: Expense = {
+      id: `EXP${Date.now()}`,
+      description: newExpense.description,
+      category: newExpense.category,
+      amount: newExpense.amount,
+      date: new Date().toISOString().split('T')[0],
+      paymentMethod: 'Bank Transfer',
+      vendor: newExpense.vendor,
+      approvalStatus: 'Pending',
+      notes: newExpense.notes
+    }
+
+    setExpenses([...expenses, expense])
+    setNewExpense({ description: '', category: 'Supplies', amount: 0, vendor: '', notes: '' })
+    setShowExpenseModal(false)
+    alert('Expense recorded successfully!')
+  }
+
+  const handleAddPayment = () => {
+    if (!newPayment.invoiceId || !newPayment.amount) {
+      alert('Please fill required fields')
+      return
+    }
+
+    const payment: Payment = {
+      id: `PAY${Date.now()}`,
+      invoiceId: newPayment.invoiceId,
+      clientId: invoices.find(inv => inv.id === newPayment.invoiceId)?.clientId || '',
+      amount: newPayment.amount,
+      paymentDate: new Date().toISOString().split('T')[0],
+      paymentMethod: newPayment.paymentMethod as any,
+      transactionRef: newPayment.transactionRef,
+      status: 'Completed'
+    }
+
+    setPayments([...payments, payment])
+
+    // Update invoice status to Paid if full amount received
+    const invoice = invoices.find(inv => inv.id === newPayment.invoiceId)
+    if (invoice && newPayment.amount >= invoice.total) {
+      setInvoices(invoices.map(inv =>
+        inv.id === newPayment.invoiceId ? { ...inv, status: 'Paid', paidDate: new Date().toISOString().split('T')[0] } : inv
+      ))
+    }
+
+    setNewPayment({ invoiceId: '', amount: 0, paymentMethod: 'Bank Transfer', transactionRef: '', attachments: [] })
+    setShowPaymentModal(false)
+    alert('Payment recorded successfully!')
+  }
+
+  const handleDeleteInvoice = (id: string) => {
+    if (confirm('Delete this invoice?')) {
+      setInvoices(invoices.filter(inv => inv.id !== id))
+    }
+  }
+
+  const handleDeleteExpense = (id: string) => {
+    if (confirm('Delete this expense?')) {
+      setExpenses(expenses.filter(exp => exp.id !== id))
+    }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-AE', {
+      style: 'currency',
+      currency: 'AED',
+      minimumFractionDigits: 2
+    }).format(amount)
+  }
+
+  const formatDate = (dateString: string) => {
+    const [year, month, day] = dateString.split('-')
+    return `${day}/${month}/${year}`
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Paid': return 'bg-green-100 text-green-700'
-      case 'Pending': return 'bg-yellow-100 text-yellow-700'
+      case 'Sent': return 'bg-blue-100 text-blue-700'
       case 'Overdue': return 'bg-red-100 text-red-700'
+      case 'Draft': return 'bg-gray-100 text-gray-700'
       default: return 'bg-gray-100 text-gray-700'
     }
   }
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'Supplies': return 'bg-blue-100 text-blue-700'
-      case 'Transportation': return 'bg-purple-100 text-purple-700'
-      case 'Payroll': return 'bg-red-100 text-red-700'
+  const getTierColor = (tier: string) => {
+    switch (tier) {
+      case 'Platinum': return 'bg-blue-100 text-blue-700'
+      case 'Gold': return 'bg-yellow-100 text-yellow-700'
+      case 'Silver': return 'bg-gray-100 text-gray-700'
+      case 'Bronze': return 'bg-orange-100 text-orange-700'
       default: return 'bg-gray-100 text-gray-700'
     }
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'invoice' | 'payment') => {
+    const files = e.target.files
+    if (!files) return
+
+    Array.from(files).forEach(file => {
+      const fileSize = (file.size / 1024).toFixed(1) + ' KB'
+      const fileObj = { name: file.name, size: fileSize, type: file.type }
+      
+      if (type === 'invoice') {
+        setNewInvoice(prev => ({
+          ...prev,
+          attachments: [...prev.attachments, fileObj]
+        }))
+      } else {
+        setNewPayment(prev => ({
+          ...prev,
+          attachments: [...prev.attachments, fileObj]
+        }))
+      }
+    })
+  }
+
+  const removeAttachment = (index: number, type: 'invoice' | 'payment') => {
+    if (type === 'invoice') {
+      setNewInvoice(prev => ({
+        ...prev,
+        attachments: prev.attachments.filter((_, i) => i !== index)
+      }))
+    } else {
+      setNewPayment(prev => ({
+        ...prev,
+        attachments: prev.attachments.filter((_, i) => i !== index)
+      }))
+    }
+  }
+
+  const getFileIcon = (fileType: string) => {
+    if (fileType.includes('pdf')) return '📄'
+    if (fileType.includes('image')) return '🖼️'
+    if (fileType.includes('word') || fileType.includes('document')) return '📝'
+    if (fileType.includes('sheet') || fileType.includes('excel')) return '📊'
+    return '📎'
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-4xl font-black text-slate-900">Finance</h1>
-          <p className="text-slate-500">Manage invoices, payments, and expenses.</p>
-        </div>
-        <button 
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-        >
-          <Plus className="h-5 w-5" />
-          New Invoice
-        </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-black">Finance & Accounting</h1>
+        <p className="text-sm text-muted-foreground mt-1">Complete financial management with invoicing, payments, expenses & reports</p>
       </div>
 
-      {/* Finance Modules Navigation */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Link
-          href="/admin/finance"
-          className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all hover:scale-105"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900">Invoices</h3>
-              <p className="text-xs text-slate-500">Create & manage</p>
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900">{invoices.length}</div>
-          <div className="text-xs text-slate-500 mt-1">Active invoices</div>
-        </Link>
-
-        <Link
-          href="/admin/finance/invoice-generator"
-          className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all hover:scale-105"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-              <Plus className="h-5 w-5 text-indigo-600" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900">Generator</h3>
-              <p className="text-xs text-slate-500">Create invoices</p>
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900">New</div>
-          <div className="text-xs text-slate-500 mt-1">Invoice creation</div>
-        </Link>
-
-        <Link
-          href="/admin/finance/debtors-dashboard"
-          className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all hover:scale-105"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center">
-              <Users className="h-5 w-5 text-red-600" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900">Debtors</h3>
-              <p className="text-xs text-slate-500">Monitor payments</p>
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900">{debtorsCount}</div>
-          <div className="text-xs text-slate-500 mt-1">Outstanding</div>
-        </Link>
-
-        <Link
-          href="/admin/finance/payment-tracker"
-          className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all hover:scale-105"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-green-100 flex items-center justify-center">
-              <Wallet className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900">Payments</h3>
-              <p className="text-xs text-slate-500">Track & monitor</p>
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900">{invoices.filter(i => i.status === 'Paid').length}</div>
-          <div className="text-xs text-slate-500 mt-1">Paid this month</div>
-        </Link>
-
-        <Link
-          href="/admin/finance/finance-reports"
-          className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all hover:scale-105"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center">
-              <BarChart3 className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900">Reports</h3>
-              <p className="text-xs text-slate-500">Analytics & insights</p>
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900">12</div>
-          <div className="text-xs text-slate-500 mt-1">Reports available</div>
-        </Link>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-black text-slate-500 uppercase tracking-wider">Total Income</span>
-            <div className="h-12 w-12 rounded-xl bg-green-100 flex items-center justify-center text-green-600">
-              <TrendingUp className="h-6 w-6" />
-            </div>
-          </div>
-          <p className="text-4xl font-black text-slate-900">AED {totalIncome.toLocaleString()}</p>
-          <p className="text-xs font-bold text-green-600 mt-2 flex items-center gap-1">
-            <ArrowUpRight className="h-3 w-3" /> +12.5% from last month
-          </p>
+      {/* Financial Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-card border rounded-2xl p-4">
+          <p className="text-[11px] text-muted-foreground font-bold uppercase">Total Income</p>
+          <p className="text-2xl font-black text-green-600 mt-1">{formatCurrency(summary.totalIncome)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{summary.paidInvoices} paid</p>
         </div>
-
-        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-black text-slate-500 uppercase tracking-wider">Total Expenses</span>
-            <div className="h-12 w-12 rounded-xl bg-red-100 flex items-center justify-center text-red-600">
-              <CreditCard className="h-6 w-6" />
-            </div>
-          </div>
-          <p className="text-4xl font-black text-slate-900">AED {totalExpenses.toLocaleString()}</p>
-          <p className="text-xs font-bold text-red-600 mt-2 flex items-center gap-1">
-            <ArrowDownRight className="h-3 w-3" /> +5.2% from last month
-          </p>
+        <div className="bg-card border rounded-2xl p-4">
+          <p className="text-[11px] text-muted-foreground font-bold uppercase">Pending</p>
+          <p className="text-2xl font-black text-blue-600 mt-1">{formatCurrency(summary.totalPending)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{summary.pendingInvoices} pending, {summary.overdueInvoices} overdue</p>
         </div>
-
-        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-black text-slate-500 uppercase tracking-wider">Net Profit</span>
-            <div className="h-12 w-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
-              <DollarSign className="h-6 w-6" />
-            </div>
-          </div>
-          <p className="text-4xl font-black text-slate-900">AED {profit.toLocaleString()}</p>
-          <p className="text-xs font-bold text-blue-600 mt-2 flex items-center gap-1">
-            <ArrowUpRight className="h-3 w-3" /> Healthy margins
-          </p>
+        <div className="bg-card border rounded-2xl p-4">
+          <p className="text-[11px] text-muted-foreground font-bold uppercase">Total Expenses</p>
+          <p className="text-2xl font-black text-red-600 mt-1">{formatCurrency(summary.totalExpenses)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{expenses.length} expenses</p>
+        </div>
+        <div className="bg-card border rounded-2xl p-4">
+          <p className="text-[11px] text-muted-foreground font-bold uppercase">Net Profit</p>
+          <p className="text-2xl font-black text-purple-600 mt-1">{formatCurrency(summary.profit)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{summary.profitMargin.toFixed(1)}% margin</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-4 border-b border-slate-200">
-        <button 
-          onClick={() => setActiveTab('invoices')}
-          className={`px-6 py-3 font-black transition-all border-b-2 ${
-            activeTab === 'invoices' 
-              ? 'text-blue-600 border-blue-600' 
-              : 'text-slate-600 border-transparent hover:text-slate-900'
-          }`}
+      <div className="flex gap-2 border-b bg-card rounded-t-2xl px-4 overflow-x-auto">
+        {[
+          { id: 'overview', label: '📊 Overview', icon: 'overview' },
+          { id: 'invoices', label: '📄 Invoices', icon: 'invoices' },
+          { id: 'payments', label: '💳 Payments', icon: 'payments' },
+          { id: 'expenses', label: '💰 Expenses', icon: 'expenses' },
+          { id: 'clients', label: '👥 Clients', icon: 'clients' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-3 font-bold text-sm whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === tab.id
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setShowInvoiceModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700"
         >
-          Invoices ({invoices.length})
+          <Plus className="h-4 w-4" />
+          Create Invoice
         </button>
-        <button 
-          onClick={() => setActiveTab('expenses')}
-          className={`px-6 py-3 font-black transition-all border-b-2 ${
-            activeTab === 'expenses' 
-              ? 'text-blue-600 border-blue-600' 
-              : 'text-slate-600 border-transparent hover:text-slate-900'
-          }`}
+        <button
+          onClick={() => setShowPaymentModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg font-bold text-sm hover:bg-green-700"
         >
-          Expenses ({expenses.length})
+          <CreditCard className="h-4 w-4" />
+          Record Payment
+        </button>
+        <button
+          onClick={() => setShowExpenseModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-lg font-bold text-sm hover:bg-orange-700"
+        >
+          <DollarSign className="h-4 w-4" />
+          Add Expense
+        </button>
+        <button
+          onClick={() => setShowClientModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg font-bold text-sm hover:bg-purple-700"
+        >
+          <Users className="h-4 w-4" />
+          Add Client
         </button>
       </div>
 
-      {/* Invoices */}
+      {/* Search & Filter */}
+      <div className="bg-card border rounded-2xl p-4">
+        <div className="flex gap-3 items-center">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search invoices, clients, expenses..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-muted/50 border rounded-lg text-sm"
+            />
+          </div>
+          {activeTab === 'invoices' && (
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2.5 bg-muted/50 border rounded-lg text-sm"
+            >
+              <option value="all">All Status</option>
+              <option value="Draft">Draft</option>
+              <option value="Sent">Sent</option>
+              <option value="Paid">Paid</option>
+              <option value="Overdue">Overdue</option>
+            </select>
+          )}
+        </div>
+      </div>
+
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Recent Invoices */}
+          <div className="bg-card border rounded-2xl p-4">
+            <h3 className="font-black mb-4">Recent Invoices</h3>
+            <div className="space-y-2">
+              {invoices.slice(0, 5).map(inv => (
+                <div key={inv.id} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                  <div className="flex-1">
+                    <p className="text-sm font-bold">{inv.invoiceNumber}</p>
+                    <p className="text-xs text-muted-foreground">{inv.clientName}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold">{formatCurrency(inv.total)}</p>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded inline-block ${getStatusColor(inv.status)}`}>
+                      {inv.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Expenses */}
+          <div className="bg-card border rounded-2xl p-4">
+            <h3 className="font-black mb-4">Recent Expenses</h3>
+            <div className="space-y-2">
+              {expenses.slice(0, 5).map(exp => (
+                <div key={exp.id} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                  <div className="flex-1">
+                    <p className="text-sm font-bold">{exp.description}</p>
+                    <p className="text-xs text-muted-foreground">{exp.category}</p>
+                  </div>
+                  <p className="text-sm font-bold text-red-600">{formatCurrency(exp.amount)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Top Clients */}
+          <div className="bg-card border rounded-2xl p-4">
+            <h3 className="font-black mb-4">Top Clients</h3>
+            <div className="space-y-2">
+              {clients.sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5).map(client => (
+                <div key={client.id} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                  <div className="flex-1">
+                    <p className="text-sm font-bold">{client.name}</p>
+                    <p className="text-xs text-muted-foreground">{client.projects} projects</p>
+                  </div>
+                  <p className="text-sm font-bold text-green-600">{formatCurrency(client.totalSpent)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Invoice Status Summary */}
+          <div className="bg-card border rounded-2xl p-4">
+            <h3 className="font-black mb-4">Invoice Status</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm">Paid</p>
+                <p className="font-bold text-green-600">{summary.paidInvoices} ({formatCurrency(summary.totalIncome)})</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm">Pending</p>
+                <p className="font-bold text-blue-600">{summary.pendingInvoices} ({formatCurrency(summary.totalPending)})</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm">Overdue</p>
+                <p className="font-bold text-red-600">{summary.overdueInvoices}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoices Tab */}
       {activeTab === 'invoices' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Invoice #</th>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Client</th>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Amount</th>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Issued</th>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Due</th>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Status</th>
-                  <th className="px-6 py-4 text-right text-xs font-black text-slate-700 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-black text-blue-600">{invoice.invoiceNumber}</td>
-                    <td className="px-6 py-4 font-bold text-slate-900">{invoice.client}</td>
-                    <td className="px-6 py-4 font-black text-slate-900">AED {invoice.amount.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-slate-600 text-sm">{invoice.issuedDate}</td>
-                    <td className="px-6 py-4 text-slate-600 text-sm">{invoice.dueDate}</td>
-                    <td className="px-6 py-4">
-                      <select 
-                        value={invoice.status}
-                        onChange={(e) => handleStatusChange(invoice.id, e.target.value)}
-                        className={`px-3 py-1.5 rounded-lg font-bold text-sm border-0 cursor-pointer ${getStatusColor(invoice.status)}`}
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="Paid">Paid</option>
-                        <option value="Overdue">Overdue</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button 
-                          onClick={() => {
-                            setSelectedInvoice(invoice)
-                            setShowDetails(true)
-                          }}
-                          className="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-600"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        {invoice.status !== 'Paid' && (
-                          <button 
-                            onClick={() => handleMarkPaid(invoice.id)}
-                            className="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 transition-all"
-                          >
-                            Mark Paid
-                          </button>
-                        )}
+        <div className="space-y-3">
+          {filteredInvoices.length > 0 ? (
+            filteredInvoices.map(inv => (
+              <div key={inv.id} className="bg-card border rounded-2xl p-4 hover:shadow-lg transition-all">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-blue-600" />
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <div>
+                        <h3 className="font-black">{inv.invoiceNumber}</h3>
+                        <p className="text-xs text-muted-foreground">{inv.clientName}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm mt-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Amount</p>
+                        <p className="font-bold">{formatCurrency(inv.total)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Issued</p>
+                        <p className="font-bold">{formatDate(inv.invoiceDate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Due</p>
+                        <p className="font-bold">{formatDate(inv.dueDate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Items</p>
+                        <p className="font-bold">{inv.lineItems.length}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Status</p>
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${getStatusColor(inv.status)}`}>
+                          {inv.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button onClick={() => setSelectedInvoice(inv)} className="p-2 hover:bg-muted rounded-lg">
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 hover:bg-red-100 text-red-600 rounded-lg">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-card border rounded-2xl p-12 text-center">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+              <p className="text-muted-foreground">No invoices found</p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Expenses */}
-      {activeTab === 'expenses' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Description</th>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Category</th>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Amount</th>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase">Payment Method</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map((expense) => (
-                  <tr key={expense.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-900">{expense.description}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1.5 rounded-lg text-xs font-bold ${getCategoryColor(expense.category)}`}>
-                        {expense.category}
+      {/* Payments Tab */}
+      {activeTab === 'payments' && (
+        <div className="space-y-3">
+          {payments.length > 0 ? (
+            payments.map(payment => {
+              const invoice = invoices.find(inv => inv.id === payment.invoiceId)
+              return (
+                <div key={payment.id} className="bg-card border rounded-2xl p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Invoice</p>
+                      <p className="font-bold text-sm">{invoice?.invoiceNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Client</p>
+                      <p className="font-bold text-sm">{invoice?.clientName}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Amount</p>
+                      <p className="font-bold text-green-600">{formatCurrency(payment.amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Date</p>
+                      <p className="font-bold text-sm">{formatDate(payment.paymentDate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Method</p>
+                      <span className="text-xs font-bold px-2 py-1 rounded bg-blue-100 text-blue-700">
+                        {payment.paymentMethod}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 font-black text-slate-900">AED {expense.amount.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-slate-600 text-sm">{expense.date}</td>
-                    <td className="px-6 py-4 text-slate-600 text-sm font-bold">{expense.paymentMethod}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          ) : (
+            <div className="bg-card border rounded-2xl p-12 text-center">
+              <CreditCard className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+              <p className="text-muted-foreground">No payments recorded</p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Add Invoice Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black text-slate-900">New Invoice</h2>
-              <button 
-                onClick={() => setShowAddModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg"
-              >
+      {/* Expenses Tab */}
+      {activeTab === 'expenses' && (
+        <div className="space-y-3">
+          {filteredExpenses.length > 0 ? (
+            filteredExpenses.map(exp => (
+              <div key={exp.id} className="bg-card border rounded-2xl p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-black">{exp.description}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">{exp.vendor || 'No vendor'} • {exp.notes || 'No notes'}</p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 text-sm">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Category</p>
+                        <span className="text-xs font-bold px-2 py-1 rounded bg-muted inline-block mt-1">{exp.category}</span>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Amount</p>
+                        <p className="font-bold text-red-600">{formatCurrency(exp.amount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Date</p>
+                        <p className="font-bold">{formatDate(exp.date)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Status</p>
+                        <span className={`text-xs font-bold px-2 py-1 rounded inline-block ${
+                          exp.approvalStatus === 'Approved' ? 'bg-green-100 text-green-700' :
+                          exp.approvalStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {exp.approvalStatus}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={() => handleDeleteExpense(exp.id)} className="p-2 hover:bg-red-100 text-red-600 rounded-lg">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-card border rounded-2xl p-12 text-center">
+              <DollarSign className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+              <p className="text-muted-foreground">No expenses found</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Clients Tab */}
+      {activeTab === 'clients' && (
+        <div className="space-y-3">
+          {filteredClients.length > 0 ? (
+            filteredClients.map(client => (
+              <div key={client.id} className="bg-card border rounded-2xl p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-black">{client.name}</h3>
+                        <p className="text-xs text-muted-foreground">{client.company}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm mt-3">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs">{client.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs">{client.phone}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs">{client.location}</span>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Spent</p>
+                        <p className="font-bold text-green-600">{formatCurrency(client.totalSpent)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Projects</p>
+                        <p className="font-bold">{client.projects}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Tier</p>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${getTierColor(client.tier)}`}>
+                          {client.tier}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-card border rounded-2xl p-12 text-center">
+              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+              <p className="text-muted-foreground">No clients found</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Create Invoice Modal */}
+      {showInvoiceModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 flex items-center justify-between p-6 bg-gradient-to-r from-blue-600/10 to-purple-600/10 border-b">
+              <h2 className="text-2xl font-black">Create Invoice</h2>
+              <button onClick={() => setShowInvoiceModal(false)} className="p-2 hover:bg-muted rounded-lg">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="space-y-4">
+
+            <div className="p-6 space-y-4">
               <div>
-                <label className="text-sm font-black text-slate-900">Client *</label>
-                <input 
-                  type="text"
-                  value={newInvoice.client}
-                  onChange={(e) => setNewInvoice({...newInvoice, client: e.target.value})}
-                  placeholder="Client Name"
-                  className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <label className="text-sm font-bold mb-2 block">Select Client *</label>
+                <div className="space-y-2 mb-4">
+                  {clients.map(client => (
+                    <button
+                      key={client.id}
+                      onClick={() => setNewInvoice({ ...newInvoice, clientId: client.id })}
+                      className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                        newInvoice.clientId === client.id
+                          ? 'bg-blue-100 border-blue-600'
+                          : 'bg-muted/50 hover:bg-muted border-muted'
+                      }`}
+                    >
+                      <p className="font-bold">{client.name}</p>
+                      <p className="text-xs text-muted-foreground">{client.company} • {client.email}</p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Add Custom Client Option */}
+                <button
+                  onClick={() => setShowClientModal(true)}
+                  className="w-full p-3 rounded-lg border-2 border-dashed border-blue-400 text-blue-600 font-bold hover:bg-blue-50 transition-colors"
+                >
+                  + Add New Client
+                </button>
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Line Items *</label>
+                <div className="space-y-3">
+                  {newInvoice.lineItems.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-5 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Description"
+                        value={item.description}
+                        onChange={(e) => {
+                          const updated = [...newInvoice.lineItems]
+                          updated[idx].description = e.target.value
+                          setNewInvoice({ ...newInvoice, lineItems: updated })
+                        }}
+                        className="col-span-2 px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Qty"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const updated = [...newInvoice.lineItems]
+                          updated[idx].quantity = Number(e.target.value)
+                          setNewInvoice({ ...newInvoice, lineItems: updated })
+                        }}
+                        className="px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Price"
+                        value={item.unitPrice}
+                        onChange={(e) => {
+                          const updated = [...newInvoice.lineItems]
+                          updated[idx].unitPrice = Number(e.target.value)
+                          setNewInvoice({ ...newInvoice, lineItems: updated })
+                        }}
+                        className="px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                      />
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setNewInvoice({
+                      ...newInvoice,
+                      lineItems: [...newInvoice.lineItems, { description: '', quantity: 1, unitPrice: 0, unit: 'service' }]
+                    })}
+                    className="w-full px-3 py-2 border-2 border-dashed rounded-lg text-sm font-bold hover:bg-muted"
+                  >
+                    + Add Line Item
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-bold mb-2 block">Due Date *</label>
+                  <input
+                    type="date"
+                    value={newInvoice.dueDate}
+                    onChange={(e) => setNewInvoice({ ...newInvoice, dueDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold mb-2 block">Payment Terms</label>
+                  <input
+                    type="text"
+                    value={newInvoice.paymentTerms}
+                    onChange={(e) => setNewInvoice({ ...newInvoice, paymentTerms: e.target.value })}
+                    className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Attachments (Documents, Proofs, etc.)</label>
+                <div className="border-2 border-dashed border-blue-300 rounded-xl p-4 text-center bg-blue-50/50 hover:bg-blue-50 transition-colors cursor-pointer">
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => handleFileUpload(e, 'invoice')}
+                    className="hidden"
+                    id="invoice-file-upload"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.txt"
+                  />
+                  <label htmlFor="invoice-file-upload" className="cursor-pointer block">
+                    <p className="text-sm font-bold text-blue-600">📤 Click to upload or drag & drop</p>
+                    <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, TXT</p>
+                  </label>
+                </div>
+
+                {newInvoice.attachments.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-bold text-muted-foreground">Attached Files:</p>
+                    {newInvoice.attachments.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-lg">{getFileIcon(file.type)}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold truncate">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">{file.size}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeAttachment(idx, 'invoice')}
+                          className="p-1 hover:bg-red-100 text-red-600 rounded"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Notes</label>
+                <textarea
+                  value={newInvoice.notes}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, notes: e.target.value })}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm h-20 resize-none"
+                  placeholder="Invoice notes..."
                 />
               </div>
-              <div>
-                <label className="text-sm font-black text-slate-900">Amount (AED) *</label>
-                <input 
-                  type="number"
-                  value={newInvoice.amount}
-                  onChange={(e) => setNewInvoice({...newInvoice, amount: e.target.value})}
-                  placeholder="0"
-                  className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-black text-slate-900">Due Date</label>
-                <input 
-                  type="date"
-                  value={newInvoice.dueDate}
-                  onChange={(e) => setNewInvoice({...newInvoice, dueDate: e.target.value})}
-                  className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button 
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2 border-2 border-slate-200 text-slate-900 font-black rounded-lg hover:bg-slate-50"
+
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setShowInvoiceModal(false)}
+                  className="flex-1 px-4 py-2 border rounded-lg hover:bg-muted font-bold text-sm"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={handleAddInvoice}
-                  className="flex-1 py-2 bg-blue-600 text-white font-black rounded-lg hover:bg-blue-700"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm"
                 >
-                  Create
+                  Create Invoice
                 </button>
               </div>
             </div>
@@ -428,48 +920,318 @@ export default function Finance() {
         </div>
       )}
 
-      {/* Invoice Details Modal */}
-      {showDetails && selectedInvoice && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black text-slate-900">Invoice Details</h2>
-              <button 
-                onClick={() => setShowDetails(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg"
-              >
+      {/* Add Client Modal */}
+      {showClientModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-3xl max-w-2xl w-full">
+            <div className="sticky top-0 flex items-center justify-between p-6 bg-gradient-to-r from-purple-600/10 to-pink-600/10 border-b">
+              <h2 className="text-2xl font-black">Add New Client</h2>
+              <button onClick={() => setShowClientModal(false)} className="p-2 hover:bg-muted rounded-lg">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-xs font-black text-blue-600 uppercase">Invoice Number</p>
-                <p className="text-2xl font-black text-blue-700">{selectedInvoice.invoiceNumber}</p>
-              </div>
-              <div>
-                <p className="text-xs font-black text-slate-500 uppercase">Client</p>
-                <p className="text-slate-900 font-bold">{selectedInvoice.client}</p>
-              </div>
-              <div>
-                <p className="text-xs font-black text-slate-500 uppercase">Amount</p>
-                <p className="text-3xl font-black text-slate-900">AED {selectedInvoice.amount.toLocaleString()}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs font-black text-slate-500 uppercase">Issued</p>
-                  <p className="text-slate-700 font-bold">{selectedInvoice.issuedDate}</p>
+                  <label className="text-sm font-bold mb-2 block">Name *</label>
+                  <input
+                    type="text"
+                    value={newClient.name}
+                    onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                    placeholder="Client name"
+                  />
                 </div>
                 <div>
-                  <p className="text-xs font-black text-slate-500 uppercase">Due</p>
-                  <p className="text-slate-700 font-bold">{selectedInvoice.dueDate}</p>
+                  <label className="text-sm font-bold mb-2 block">Company</label>
+                  <input
+                    type="text"
+                    value={newClient.company}
+                    onChange={(e) => setNewClient({ ...newClient, company: e.target.value })}
+                    className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                    placeholder="Company name"
+                  />
                 </div>
               </div>
-              <button 
-                onClick={() => setShowDetails(false)}
-                className="w-full py-2 bg-blue-600 text-white font-black rounded-lg hover:bg-blue-700 mt-6"
-              >
-                Close
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-bold mb-2 block">Email *</label>
+                  <input
+                    type="email"
+                    value={newClient.email}
+                    onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+                    className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold mb-2 block">Phone</label>
+                  <input
+                    type="tel"
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
+                    className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                    placeholder="+971-4-XXXX-XXXX"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Location</label>
+                <input
+                  type="text"
+                  value={newClient.location}
+                  onChange={(e) => setNewClient({ ...newClient, location: e.target.value })}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                  placeholder="Dubai, UAE"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Notes</label>
+                <textarea
+                  value={newClient.notes}
+                  onChange={(e) => setNewClient({ ...newClient, notes: e.target.value })}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm h-16 resize-none"
+                  placeholder="Client notes..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setShowClientModal(false)}
+                  className="flex-1 px-4 py-2 border rounded-lg hover:bg-muted font-bold text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddClient}
+                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold text-sm"
+                >
+                  Add Client
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Expense Modal */}
+      {showExpenseModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-3xl max-w-2xl w-full">
+            <div className="sticky top-0 flex items-center justify-between p-6 bg-gradient-to-r from-orange-600/10 to-red-600/10 border-b">
+              <h2 className="text-2xl font-black">Record Expense</h2>
+              <button onClick={() => setShowExpenseModal(false)} className="p-2 hover:bg-muted rounded-lg">
+                <X className="h-5 w-5" />
               </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-sm font-bold mb-2 block">Description *</label>
+                <input
+                  type="text"
+                  value={newExpense.description}
+                  onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                  placeholder="Expense description"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-bold mb-2 block">Category</label>
+                  <select
+                    value={newExpense.category}
+                    onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+                    className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                  >
+                    <option value="Supplies">Supplies</option>
+                    <option value="Transportation">Transportation</option>
+                    <option value="Payroll">Payroll</option>
+                    <option value="Equipment">Equipment</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-bold mb-2 block">Amount *</label>
+                  <input
+                    type="number"
+                    value={newExpense.amount}
+                    onChange={(e) => setNewExpense({ ...newExpense, amount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Vendor</label>
+                <input
+                  type="text"
+                  value={newExpense.vendor}
+                  onChange={(e) => setNewExpense({ ...newExpense, vendor: e.target.value })}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                  placeholder="Vendor name"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Notes</label>
+                <textarea
+                  value={newExpense.notes}
+                  onChange={(e) => setNewExpense({ ...newExpense, notes: e.target.value })}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm h-16 resize-none"
+                  placeholder="Expense notes..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setShowExpenseModal(false)}
+                  className="flex-1 px-4 py-2 border rounded-lg hover:bg-muted font-bold text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddExpense}
+                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-bold text-sm"
+                >
+                  Record Expense
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-3xl max-w-2xl w-full">
+            <div className="sticky top-0 flex items-center justify-between p-6 bg-gradient-to-r from-green-600/10 to-emerald-600/10 border-b">
+              <h2 className="text-2xl font-black">Record Payment</h2>
+              <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-muted rounded-lg">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-sm font-bold mb-2 block">Invoice *</label>
+                <select
+                  value={newPayment.invoiceId}
+                  onChange={(e) => {
+                    const inv = invoices.find(i => i.id === e.target.value)
+                    setNewPayment({ ...newPayment, invoiceId: e.target.value, amount: inv?.total || 0 })
+                  }}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                >
+                  <option value="">Select invoice...</option>
+                  {invoices.filter(inv => inv.status !== 'Paid').map(inv => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.invoiceNumber} - {inv.clientName} - {formatCurrency(inv.total)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Amount *</label>
+                <input
+                  type="number"
+                  value={newPayment.amount}
+                  onChange={(e) => setNewPayment({ ...newPayment, amount: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Payment Method</label>
+                <select
+                  value={newPayment.paymentMethod}
+                  onChange={(e) => setNewPayment({ ...newPayment, paymentMethod: e.target.value })}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                >
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Credit Card">Credit Card</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Online">Online</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Transaction Reference</label>
+                <input
+                  type="text"
+                  value={newPayment.transactionRef}
+                  onChange={(e) => setNewPayment({ ...newPayment, transactionRef: e.target.value })}
+                  className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm"
+                  placeholder="TXN-XXXX-XXXX"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">Proof of Payment (Receipt, Bank Statement, etc.)</label>
+                <div className="border-2 border-dashed border-green-300 rounded-xl p-4 text-center bg-green-50/50 hover:bg-green-50 transition-colors cursor-pointer">
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => handleFileUpload(e, 'payment')}
+                    className="hidden"
+                    id="payment-file-upload"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                  />
+                  <label htmlFor="payment-file-upload" className="cursor-pointer block">
+                    <p className="text-sm font-bold text-green-600">📤 Click to upload proof of payment</p>
+                    <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX, JPG, PNG, TXT</p>
+                  </label>
+                </div>
+
+                {newPayment.attachments.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-bold text-muted-foreground">Attached Files:</p>
+                    {newPayment.attachments.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-lg">{getFileIcon(file.type)}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold truncate">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">{file.size}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeAttachment(idx, 'payment')}
+                          className="p-1 hover:bg-red-100 text-red-600 rounded"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 px-4 py-2 border rounded-lg hover:bg-muted font-bold text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddPayment}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-sm"
+                >
+                  Record Payment
+                </button>
+              </div>
             </div>
           </div>
         </div>

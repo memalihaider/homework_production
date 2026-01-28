@@ -16,7 +16,6 @@ import {
   AlertCircle,
   XCircle,
   Eye,
-  Edit2,
   Trash2,
   Download,
   MessageSquare,
@@ -25,9 +24,12 @@ import {
   MapPin as LocationIcon,
   TrendingUp,
   Users,
-  MoreVertical
+  X,
+  Edit2,
+  Save,
+  Plus
 } from 'lucide-react'
-import { MOCK_BOOKINGS, Booking, getServiceById } from '@/lib/bookings-services-data'
+import { MOCK_BOOKINGS, Booking, MOCK_SERVICES } from '@/lib/bookings-services-data'
 
 const statusIcons = {
   pending: AlertCircle,
@@ -51,9 +53,12 @@ export default function AdminBookings() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [isEditingDetails, setIsEditingDetails] = useState(false)
+  const [editFormData, setEditFormData] = useState<Booking | null>(null)
+  const [sortBy, setSortBy] = useState<string>('date-desc')
 
-  const filteredBookings = useMemo(() => {
-    return bookings.filter(booking => {
+  const filteredAndSortedBookings = useMemo(() => {
+    let filtered = bookings.filter(booking => {
       const matchesSearch = 
         booking.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         booking.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -64,7 +69,29 @@ export default function AdminBookings() {
       
       return matchesSearch && matchesStatus
     })
-  }, [bookings, searchTerm, selectedStatus])
+
+    // Sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'date-desc':
+          return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime()
+        case 'date-asc':
+          return new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime()
+        case 'price-desc':
+          return b.estimatedPrice - a.estimatedPrice
+        case 'price-asc':
+          return a.estimatedPrice - b.estimatedPrice
+        case 'name-asc':
+          return a.clientName.localeCompare(b.clientName)
+        case 'name-desc':
+          return b.clientName.localeCompare(a.clientName)
+        default:
+          return 0
+      }
+    })
+
+    return filtered
+  }, [bookings, searchTerm, selectedStatus, sortBy])
 
   const stats = {
     total: bookings.length,
@@ -83,15 +110,32 @@ export default function AdminBookings() {
         ? { ...b, status: newStatus, updatedAt: new Date().toISOString().split('T')[0] }
         : b
     ))
+    if (selectedBooking?.id === bookingId) {
+      setSelectedBooking({ ...selectedBooking, status: newStatus })
+    }
+  }
+
+  const handleDeleteBooking = (bookingId: string) => {
+    if (confirm('Are you sure you want to delete this booking?')) {
+      setBookings(bookings.filter(b => b.id !== bookingId))
+      setShowDetailsModal(false)
+      setSelectedBooking(null)
+    }
   }
 
   const handleViewDetails = (booking: Booking) => {
     setSelectedBooking(booking)
+    setEditFormData({ ...booking })
     setShowDetailsModal(true)
+    setIsEditingDetails(false)
   }
 
-  const handleDeleteBooking = (bookingId: string) => {
-    setBookings(bookings.filter(b => b.id !== bookingId))
+  const handleSaveEdits = () => {
+    if (editFormData) {
+      setBookings(bookings.map(b => b.id === editFormData.id ? editFormData : b))
+      setSelectedBooking(editFormData)
+      setIsEditingDetails(false)
+    }
   }
 
   const statuses = ['all', 'pending', 'confirmed', 'in-progress', 'completed', 'cancelled']
@@ -222,12 +266,25 @@ export default function AdminBookings() {
             ))}
           </select>
         </div>
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="px-4 py-2.5 bg-muted/50 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+        >
+          <option value="date-desc">Latest First</option>
+          <option value="date-asc">Oldest First</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="name-asc">Name A-Z</option>
+          <option value="name-desc">Name Z-A</option>
+        </select>
       </div>
 
       {/* Bookings List */}
       <div className="space-y-4">
-        {filteredBookings.length > 0 ? (
-          filteredBookings.map((booking) => {
+        {filteredAndSortedBookings.length > 0 ? (
+          filteredAndSortedBookings.map((booking) => {
             const StatusIcon = statusIcons[booking.status]
             return (
               <div
@@ -286,7 +343,7 @@ export default function AdminBookings() {
                           <select
                             value={booking.status}
                             onChange={(e) => handleStatusChange(booking.id, e.target.value as Booking['status'])}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border-none outline-none transition-all ${statusColors[booking.status]}`}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border-none outline-none transition-all cursor-pointer ${statusColors[booking.status]}`}
                           >
                             <option value="pending">Pending</option>
                             <option value="confirmed">Confirmed</option>
@@ -311,7 +368,7 @@ export default function AdminBookings() {
                     <button
                       onClick={() => handleViewDetails(booking)}
                       className="p-2 hover:bg-blue-100 dark:hover:bg-blue-950/30 rounded-lg text-blue-600 transition-colors"
-                      title="View details"
+                      title="View & edit details"
                     >
                       <Eye className="h-4 w-4" />
                     </button>
@@ -320,12 +377,6 @@ export default function AdminBookings() {
                       title="Send message"
                     >
                       <MessageSquare className="h-4 w-4" />
-                    </button>
-                    <button
-                      className="p-2 hover:bg-green-100 dark:hover:bg-green-950/30 rounded-lg text-green-600 transition-colors"
-                      title="Call client"
-                    >
-                      <PhoneIcon className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteBooking(booking.id)}
@@ -347,6 +398,242 @@ export default function AdminBookings() {
           </div>
         )}
       </div>
+
+      {/* Details Modal */}
+      {showDetailsModal && selectedBooking && editFormData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-card border-b p-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black">Booking Details</h2>
+                <p className="text-sm text-muted-foreground mt-1">{selectedBooking.bookingNumber}</p>
+              </div>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="p-2 hover:bg-muted rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Service Info */}
+              <div className="bg-muted/50 rounded-xl p-4">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Service</p>
+                <p className="text-lg font-black">{editFormData.serviceName}</p>
+              </div>
+
+              {/* Client Information */}
+              <div>
+                <h3 className="text-sm font-black mb-3 flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Client Information
+                </h3>
+                <div className="space-y-3">
+                  {isEditingDetails ? (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Full Name</label>
+                        <input
+                          type="text"
+                          value={editFormData.clientName}
+                          onChange={(e) => setEditFormData({ ...editFormData, clientName: e.target.value })}
+                          className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Email</label>
+                        <input
+                          type="email"
+                          value={editFormData.clientEmail}
+                          onChange={(e) => setEditFormData({ ...editFormData, clientEmail: e.target.value })}
+                          className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Phone</label>
+                        <input
+                          type="tel"
+                          value={editFormData.clientPhone}
+                          onChange={(e) => setEditFormData({ ...editFormData, clientPhone: e.target.value })}
+                          className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Address</label>
+                        <input
+                          type="text"
+                          value={editFormData.clientAddress}
+                          onChange={(e) => setEditFormData({ ...editFormData, clientAddress: e.target.value })}
+                          className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Name</p>
+                          <p className="font-bold">{editFormData.clientName}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Phone</p>
+                          <p className="font-bold">{editFormData.clientPhone}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Email</p>
+                        <p className="font-bold">{editFormData.clientEmail}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Service Address</p>
+                        <p className="font-bold">{editFormData.clientAddress}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Booking Schedule */}
+              <div>
+                <h3 className="text-sm font-black mb-3 flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Schedule
+                </h3>
+                <div className="space-y-3">
+                  {isEditingDetails ? (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Date</label>
+                        <input
+                          type="date"
+                          value={editFormData.bookingDate}
+                          onChange={(e) => setEditFormData({ ...editFormData, bookingDate: e.target.value })}
+                          className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Time</label>
+                        <input
+                          type="time"
+                          value={editFormData.bookingTime}
+                          onChange={(e) => setEditFormData({ ...editFormData, bookingTime: e.target.value })}
+                          className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Date</p>
+                          <p className="font-bold">{editFormData.bookingDate}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Time</p>
+                          <p className="font-bold">{editFormData.bookingTime}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Duration</p>
+                        <p className="font-bold">{editFormData.duration} hours</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Pricing */}
+              <div>
+                <h3 className="text-sm font-black mb-3 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Pricing
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-muted/50 rounded-xl p-3">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Estimated Price</p>
+                    <p className="text-xl font-black">AED {editFormData.estimatedPrice.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-xl p-3">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Status</p>
+                    <select
+                      value={editFormData.status}
+                      onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as Booking['status'] })}
+                      className={`w-full px-2 py-1 rounded-lg text-xs font-bold border-none outline-none cursor-pointer ${statusColors[editFormData.status]}`}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="in-progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <h3 className="text-sm font-black mb-3">Special Notes</h3>
+                {isEditingDetails ? (
+                  <textarea
+                    value={editFormData.notes || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                    placeholder="Add any special notes or requests..."
+                    className="w-full px-3 py-2 bg-muted/50 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none h-24"
+                  />
+                ) : (
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-sm text-muted-foreground">{editFormData.notes || 'No notes added'}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Metadata */}
+              <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
+                <p>Created: {editFormData.createdAt}</p>
+                <p>Updated: {editFormData.updatedAt}</p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="sticky bottom-0 bg-muted/50 border-t p-4 flex items-center justify-between gap-3">
+              <button
+                onClick={() => handleDeleteBooking(selectedBooking.id)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-700 transition-colors"
+              >
+                Delete Booking
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="px-4 py-2 border rounded-lg font-bold text-sm hover:bg-muted transition-colors"
+                >
+                  Close
+                </button>
+                {isEditingDetails ? (
+                  <button
+                    onClick={handleSaveEdits}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    Save Changes
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsEditingDetails(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                    Edit Details
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

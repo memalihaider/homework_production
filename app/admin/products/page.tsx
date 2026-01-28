@@ -1,238 +1,211 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Package, Archive, Zap, BarChart3, TrendingUp, DollarSign, Users } from 'lucide-react'
+import { Plus, Package, Archive, Zap, BarChart3, TrendingUp, DollarSign, Settings, Download } from 'lucide-react'
+import ProductDashboard from './components/ProductDashboard'
+import ProductList from './components/ProductList'
+import ProductBuilder from './components/ProductBuilder'
+import CategoryManager from './components/CategoryManager'
+import { MOCK_PRODUCTS, PRODUCT_CATEGORIES, STORAGE_KEYS, ProductItem, Category } from './lib/products-data'
 
-interface Category {
-  id: number
-  name: string
-  description: string
-  color: string
-  createdAt: string
-  serviceCount: number
-  productCount: number
-}
-
-interface Service {
-  id: number
-  name: string
-  description: string
-  categoryId: number
-  categoryName: string
-  basePrice: number
-  unit: string
-  createdAt: string
-}
-
-interface Product {
-  id: number
-  name: string
-  description: string
-  categoryId: number
-  categoryName: string
-  price: number
-  unit: string
-  createdAt: string
-}
+type TabType = 'DASHBOARD' | 'INVENTORY' | 'CATEGORIES';
 
 export default function ProductsPage() {
+  const [activeTab, setActiveTab] = useState<TabType>('DASHBOARD')
+  const [products, setProducts] = useState<ProductItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [services, setServices] = useState<Service[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [stats, setStats] = useState({
-    totalCategories: 0,
-    totalServices: 0,
-    totalProducts: 0,
-    totalValue: 0
-  })
+  const [editingItem, setEditingItem] = useState<ProductItem | null>(null)
+  const [showBuilder, setShowBuilder] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
+  // Initialization
   useEffect(() => {
-    // Load data from localStorage
-    const savedCategories = localStorage.getItem('homeware_product_categories')
-    const savedServices = localStorage.getItem('homeware_product_services')
-    const savedProducts = localStorage.getItem('homeware_product_products')
-
-    if (savedCategories) {
-      const parsedCategories = JSON.parse(savedCategories)
-      setCategories(parsedCategories)
-    }
-
-    if (savedServices) {
-      const parsedServices = JSON.parse(savedServices)
-      setServices(parsedServices)
-    }
+    const savedProducts = localStorage.getItem(STORAGE_KEYS.PRODUCTS)
+    const savedCategories = localStorage.getItem(STORAGE_KEYS.CATEGORIES)
 
     if (savedProducts) {
-      const parsedProducts = JSON.parse(savedProducts)
-      setProducts(parsedProducts)
+      setProducts(JSON.parse(savedProducts))
+    } else {
+      setProducts(MOCK_PRODUCTS)
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(MOCK_PRODUCTS))
     }
 
-    // Calculate stats
-    const totalCategories = savedCategories ? JSON.parse(savedCategories).length : 0
-    const totalServices = savedServices ? JSON.parse(savedServices).length : 0
-    const totalProducts = savedProducts ? JSON.parse(savedProducts).length : 0
-    const totalValue = (savedServices ? JSON.parse(savedServices).reduce((sum: number, service: Service) => sum + service.basePrice, 0) : 0) +
-                      (savedProducts ? JSON.parse(savedProducts).reduce((sum: number, product: Product) => sum + product.price, 0) : 0)
-
-    setStats({
-      totalCategories,
-      totalServices,
-      totalProducts,
-      totalValue
-    })
+    if (savedCategories) {
+      setCategories(JSON.parse(savedCategories))
+    } else {
+      setCategories(PRODUCT_CATEGORIES)
+      localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(PRODUCT_CATEGORIES))
+    }
+    
+    setIsLoading(false)
   }, [])
 
+  // Persist changes
+  useEffect(() => {
+    if (!isLoading) {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products))
+      localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories))
+    }
+  }, [products, categories, isLoading])
+
+  const handleSaveProduct = (data: Partial<ProductItem>) => {
+    if (editingItem) {
+      setProducts(prev => prev.map(p => p.id === editingItem.id ? { ...p, ...data } as ProductItem : p))
+    } else {
+      const newItem: ProductItem = {
+        ...data,
+        id: `prod_${Date.now()}`,
+        lastUpdated: new Date().toISOString(),
+      } as ProductItem
+      setProducts(prev => [newItem, ...prev])
+    }
+    setShowBuilder(false)
+    setEditingItem(null)
+  }
+
+  const handleDeleteProduct = (id: string) => {
+    if (confirm('Are you sure you want to delete this item?')) {
+      setProducts(prev => prev.filter(p => p.id !== id))
+    }
+  }
+
+  const handleSaveCategory = (data: Partial<Category>) => {
+    if (data.id) {
+      setCategories(prev => prev.map(c => c.id === data.id ? { ...c, ...data } as Category : c))
+    } else {
+      const newCat: Category = {
+        ...data,
+        id: `cat_${Date.now()}`,
+        itemCount: 0
+      } as Category
+      setCategories(prev => [...prev, newCat])
+    }
+  }
+
+  const handleDeleteCategory = (id: string) => {
+    const hasItems = products.some(p => p.categoryId === id)
+    if (hasItems) {
+      alert('Cannot delete category with active items. Reassign items first.')
+      return
+    }
+    if (confirm('Delete this category?')) {
+      setCategories(prev => prev.filter(c => c.id !== id))
+    }
+  }
+
+  if (isLoading) return null;
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-4xl font-black text-slate-900">Product Management</h1>
-          <p className="text-slate-500">Manage categories, services, and products for your quotations.</p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => window.location.href = '/admin/products/categories'}
-            className="inline-flex items-center gap-2 px-4 py-3 border border-slate-200 text-slate-700 font-black rounded-xl hover:bg-slate-50 transition-all"
-          >
-            <Archive className="h-5 w-5" />
-            Manage Categories
-          </button>
-          <button
-            onClick={() => window.location.href = '/admin/products/services'}
-            className="inline-flex items-center gap-2 px-4 py-3 border border-slate-200 text-slate-700 font-black rounded-xl hover:bg-slate-50 transition-all"
-          >
-            <Zap className="h-5 w-5" />
-            Manage Services
-          </button>
-          <button
-            onClick={() => window.location.href = '/admin/products/products'}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-          >
-            <Package className="h-5 w-5" />
-            Manage Products
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Archive className="h-6 w-6 text-blue-600" />
-            </div>
+    <div className="min-h-screen bg-white">
+      {/* Header Section */}
+      <div className="border-b border-gray-200">
+        <div className="max-w-[1600px] mx-auto px-8 py-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
-              <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Categories</p>
-              <p className="text-3xl font-black text-slate-900 mt-1">{stats.totalCategories}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Zap className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Services</p>
-              <p className="text-3xl font-black text-slate-900 mt-1">{stats.totalServices}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Package className="h-6 w-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Products</p>
-              <p className="text-3xl font-black text-slate-900 mt-1">{stats.totalProducts}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <DollarSign className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Total Value</p>
-              <p className="text-3xl font-black text-slate-900 mt-1">AED {stats.totalValue.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Categories */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-black text-slate-900">Recent Categories</h2>
-          <button
-            onClick={() => window.location.href = '/admin/products/categories'}
-            className="text-blue-600 hover:text-blue-700 font-bold text-sm"
-          >
-            View All →
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {categories.slice(0, 6).map((category) => (
-            <div key={category.id} className="p-4 border border-slate-100 rounded-lg hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-3 mb-3">
-                <div
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: category.color }}
-                ></div>
-                <h3 className="font-black text-slate-900">{category.name}</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-1 bg-black" />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Inventory Management System</span>
               </div>
-              <p className="text-sm text-slate-600 mb-3">{category.description}</p>
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>{category.serviceCount} services</span>
-                <span>{category.productCount} products</span>
-              </div>
+              <h1 className="text-5xl font-black text-black tracking-tighter uppercase italic">
+                Products <span className="text-gray-300">&</span> Services
+              </h1>
             </div>
-          ))}
-          {categories.length === 0 && (
-            <div className="col-span-full text-center py-8">
-              <Archive className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">No categories created yet.</p>
-              <button
-                onClick={() => window.location.href = '/admin/products/categories'}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white font-black rounded-lg hover:bg-blue-700"
-              >
-                Create First Category
+            <div className="flex items-center gap-3">
+              <button className="flex items-center gap-2 px-6 py-3 border border-gray-200 text-[10px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all">
+                <Download className="h-4 w-4" />
+                Export Data
               </button>
+              {!showBuilder && (
+                <button 
+                  onClick={() => {
+                    setEditingItem(null)
+                    setShowBuilder(true)
+                  }}
+                  className="flex items-center gap-2 px-6 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 transition-all shadow-xl shadow-black/10"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add New Item
+                </button>
+              )}
+            </div>
+          </div>
+
+          {!showBuilder && (
+            <div className="flex gap-10 mt-12 border-b border-gray-100">
+              {[
+                { id: 'DASHBOARD', label: 'Overview', icon: BarChart3 },
+                { id: 'INVENTORY', label: 'Inventory List', icon: Package },
+                { id: 'CATEGORIES', label: 'Categories', icon: Archive },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as TabType)}
+                  className={`flex items-center gap-2 pb-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative ${
+                    activeTab === tab.id ? 'text-black' : 'text-gray-400 hover:text-black'
+                  }`}
+                >
+                  <tab.icon className={`h-4 w-4 ${activeTab === tab.id ? 'text-black' : 'text-gray-300'}`} />
+                  {tab.label}
+                  {activeTab === tab.id && (
+                    <div className="absolute bottom-0 left-0 w-full h-1 bg-black" />
+                  )}
+                </button>
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <h2 className="text-2xl font-black text-slate-900 mb-6">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button
-            onClick={() => window.location.href = '/admin/products/categories'}
-            className="p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all text-left group"
-          >
-            <Archive className="h-8 w-8 text-slate-400 group-hover:text-blue-600 mb-3" />
-            <h3 className="font-black text-slate-900 mb-2">Add Category</h3>
-            <p className="text-sm text-slate-600">Create new service categories to organize your offerings.</p>
-          </button>
-          <button
-            onClick={() => window.location.href = '/admin/products/services'}
-            className="p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all text-left group"
-          >
-            <Zap className="h-8 w-8 text-slate-400 group-hover:text-green-600 mb-3" />
-            <h3 className="font-black text-slate-900 mb-2">Add Service</h3>
-            <p className="text-sm text-slate-600">Define services within categories for quotations.</p>
-          </button>
-          <button
-            onClick={() => window.location.href = '/admin/products/products'}
-            className="p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all text-left group"
-          >
-            <Package className="h-8 w-8 text-slate-400 group-hover:text-purple-600 mb-3" />
-            <h3 className="font-black text-slate-900 mb-2">Add Product</h3>
-            <p className="text-sm text-slate-600">Add products and materials to your catalog.</p>
-          </button>
+      {/* Main Content */}
+      <div className="max-w-[1600px] mx-auto px-8 py-10">
+        {showBuilder ? (
+          <ProductBuilder 
+            product={editingItem} 
+            categories={categories}
+            onSave={handleSaveProduct}
+            onCancel={() => {
+              setShowBuilder(false)
+              setEditingItem(null)
+            }}
+          />
+        ) : (
+          <div className="animate-in fade-in duration-500">
+            {activeTab === 'DASHBOARD' && (
+              <ProductDashboard products={products} categories={categories} />
+            )}
+            
+            {activeTab === 'INVENTORY' && (
+              <ProductList 
+                products={products} 
+                categories={categories}
+                onEdit={(item) => {
+                  setEditingItem(item)
+                  setShowBuilder(true)
+                }}
+                onDelete={handleDeleteProduct}
+              />
+            )}
+            
+            {activeTab === 'CATEGORIES' && (
+              <CategoryManager 
+                categories={categories}
+                onSave={handleSaveCategory}
+                onDelete={handleDeleteCategory}
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Quick Footer Info */}
+      <div className="fixed bottom-0 right-0 p-4">
+        <div className="bg-black text-white px-4 py-2 flex items-center gap-4 border border-white/10 shadow-2xl">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-[9px] font-bold uppercase tracking-widest">System Cloud Synced</span>
+          </div>
+          <div className="w-px h-4 bg-white/20" />
+          <span className="text-[9px] font-bold uppercase tracking-widest opacity-60">V.2.4.0 PROFESSIONAL</span>
         </div>
       </div>
     </div>

@@ -26,7 +26,8 @@ import {
   Bell,
   History,
   RefreshCw,
-  MapPin
+  MapPin,
+  ShoppingCart
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -44,7 +45,7 @@ type Reminder = {
 
 type TrackingLog = {
   id: string
-  type: 'equipment' | 'permit'
+  type: 'equipment' | 'permit' | 'material'
   itemId: number
   itemName: string
   action: string
@@ -53,8 +54,23 @@ type TrackingLog = {
   details: string
 }
 
+type Material = {
+  id: number
+  name: string
+  category: string
+  quantity: number
+  unit: string
+  cost: number
+  supplier: string
+  dateAdded: string
+  status: 'In Stock' | 'Low Stock' | 'Out of Stock'
+  location: string
+  reorderLevel: number
+  invoices: Array<{id: string, type: string, file: string, date: string, amount: string}>
+}
+
 export default function EquipmentPermitsPage() {
-  const [activeTab, setActiveTab] = useState<'equipment' | 'permits' | 'tracking' | 'reminders'>('equipment')
+  const [activeTab, setActiveTab] = useState<'equipment' | 'permits' | 'materials' | 'tracking' | 'reminders'>('equipment')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [showReminderModal, setShowReminderModal] = useState(false)
@@ -138,13 +154,24 @@ export default function EquipmentPermitsPage() {
     { id: 5, name: 'Commercial License', category: 'Commercial', status: 'Active', issueDate: '2023-12-01', expiryDate: '2025-12-01', issuer: 'Commerce Ministry', renewalDate: '2025-11-01', cost: 2000 },
   ])
 
+  // Materials State
+  const [materials, setMaterials] = useState<Material[]>([
+    { id: 1, name: 'Cleaning Solution', category: 'Chemicals', quantity: 150, unit: 'liter', cost: 2500, supplier: 'ChemSupply Co', dateAdded: '2025-01-10', status: 'In Stock', location: 'Warehouse A', reorderLevel: 50, invoices: [] },
+    { id: 2, name: 'Microfiber Cloths', category: 'Textiles', quantity: 500, unit: 'piece', cost: 1200, supplier: 'TextilePro', dateAdded: '2025-01-15', status: 'In Stock', location: 'Warehouse B', reorderLevel: 100, invoices: [] },
+    { id: 3, name: 'Safety Gloves', category: 'PPE', quantity: 45, unit: 'box', cost: 800, supplier: 'SafetyGear Ltd', dateAdded: '2024-12-20', status: 'Low Stock', location: 'Storage Room', reorderLevel: 100, invoices: [] },
+    { id: 4, name: 'Floor Wax', category: 'Chemicals', quantity: 0, unit: 'liter', cost: 1800, supplier: 'FloorCare Inc', dateAdded: '2025-01-05', status: 'Out of Stock', location: 'Warehouse A', reorderLevel: 30, invoices: [] },
+  ])
+
   // Modals
   const [showAddEquipmentModal, setShowAddEquipmentModal] = useState(false)
   const [showAddPermitModal, setShowAddPermitModal] = useState(false)
+  const [showAddMaterialModal, setShowAddMaterialModal] = useState(false)
   const [showEditEquipmentModal, setShowEditEquipmentModal] = useState(false)
   const [showEditPermitModal, setShowEditPermitModal] = useState(false)
+  const [showEditMaterialModal, setShowEditMaterialModal] = useState(false)
   const [selectedEquipment, setSelectedEquipment] = useState<any>(null)
   const [selectedPermit, setSelectedPermit] = useState<any>(null)
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
 
   // Form States
   const [equipmentForm, setEquipmentForm] = useState({
@@ -155,7 +182,17 @@ export default function EquipmentPermitsPage() {
     cost: '',
     quantity: '1',
     condition: 'Good',
-    maintenanceDate: ''
+    maintenanceDate: '',
+    invoices: [] as Array<{id: string, type: string, file: string, date: string, amount: string}>,
+    materials: [] as Array<{id: string, name: string, quantity: string, unit: string, cost: string}>,
+    invoiceType: 'repairing',
+    invoiceFile: '',
+    invoiceAmount: '',
+    invoiceDate: '',
+    materialName: '',
+    materialQuantity: '',
+    materialUnit: 'piece',
+    materialCost: ''
   })
 
   const [permitForm, setPermitForm] = useState({
@@ -167,6 +204,22 @@ export default function EquipmentPermitsPage() {
     issueDate: '',
     expiryDate: '',
     renewalDate: ''
+  })
+
+  const [materialForm, setMaterialForm] = useState({
+    name: '',
+    category: 'Chemicals',
+    quantity: '',
+    unit: 'piece',
+    cost: '',
+    supplier: '',
+    location: '',
+    reorderLevel: '',
+    invoices: [] as Array<{id: string, type: string, file: string, date: string, amount: string}>,
+    invoiceType: 'purchase',
+    invoiceFile: '',
+    invoiceAmount: '',
+    invoiceDate: ''
   })
 
   // Auto-check for overdue items and update reminders
@@ -186,7 +239,7 @@ export default function EquipmentPermitsPage() {
   }, [])
 
   // Log tracking action
-  const addTrackingLog = (type: 'equipment' | 'permit', itemId: number, itemName: string, action: string, details: string) => {
+  const addTrackingLog = (type: 'equipment' | 'permit' | 'material', itemId: number, itemName: string, action: string, details: string) => {
     const newLog: TrackingLog = {
       id: `t${Date.now()}`,
       type,
@@ -205,9 +258,16 @@ export default function EquipmentPermitsPage() {
     if (equipmentForm.name && equipmentForm.location) {
       const newEquipment = {
         id: Math.max(...equipment.map(e => e.id), 0) + 1,
-        ...equipmentForm,
+        name: equipmentForm.name,
+        category: equipmentForm.category,
+        status: equipmentForm.status,
+        location: equipmentForm.location,
         cost: parseInt(equipmentForm.cost) || 0,
         quantity: parseInt(equipmentForm.quantity) || 1,
+        condition: equipmentForm.condition,
+        maintenanceDate: equipmentForm.maintenanceDate,
+        invoices: equipmentForm.invoices,
+        materials: equipmentForm.materials,
         purchaseDate: new Date().toISOString().split('T')[0],
         lastServiced: new Date().toISOString().split('T')[0]
       }
@@ -221,7 +281,17 @@ export default function EquipmentPermitsPage() {
         cost: '',
         quantity: '1',
         condition: 'Good',
-        maintenanceDate: ''
+        maintenanceDate: '',
+        invoices: [],
+        materials: [],
+        invoiceType: 'repairing',
+        invoiceFile: '',
+        invoiceAmount: '',
+        invoiceDate: '',
+        materialName: '',
+        materialQuantity: '',
+        materialUnit: 'piece',
+        materialCost: ''
       })
       setShowAddEquipmentModal(false)
     }
@@ -253,7 +323,17 @@ export default function EquipmentPermitsPage() {
         cost: '',
         quantity: '1',
         condition: 'Good',
-        maintenanceDate: ''
+        maintenanceDate: '',
+        invoices: [],
+        materials: [],
+        invoiceType: 'repairing',
+        invoiceFile: '',
+        invoiceAmount: '',
+        invoiceDate: '',
+        materialName: '',
+        materialQuantity: '',
+        materialUnit: 'piece',
+        materialCost: ''
       })
     }
   }
@@ -357,6 +437,118 @@ export default function EquipmentPermitsPage() {
     setPermits(permits.filter(p => p.id !== id))
   }
 
+  // Material Handlers
+  const handleAddMaterial = () => {
+    if (materialForm.name && materialForm.quantity && materialForm.cost && materialForm.supplier) {
+      const newMaterial: Material = {
+        id: Math.max(...materials.map(m => m.id), 0) + 1,
+        name: materialForm.name,
+        category: materialForm.category,
+        quantity: parseInt(materialForm.quantity) || 0,
+        unit: materialForm.unit,
+        cost: parseInt(materialForm.cost) || 0,
+        supplier: materialForm.supplier,
+        location: materialForm.location,
+        reorderLevel: parseInt(materialForm.reorderLevel) || 0,
+        dateAdded: new Date().toISOString().split('T')[0],
+        status: 'In Stock',
+        invoices: materialForm.invoices
+      }
+      setMaterials([...materials, newMaterial])
+      addTrackingLog('material', newMaterial.id, newMaterial.name, 'Added', `New material added from ${newMaterial.supplier}`)
+      setMaterialForm({
+        name: '',
+        category: 'Chemicals',
+        quantity: '',
+        unit: 'piece',
+        cost: '',
+        supplier: '',
+        location: '',
+        reorderLevel: '',
+        invoices: [],
+        invoiceType: 'purchase',
+        invoiceFile: '',
+        invoiceAmount: '',
+        invoiceDate: ''
+      })
+      setShowAddMaterialModal(false)
+    }
+  }
+
+  const handleEditMaterial = () => {
+    if (selectedMaterial && materialForm.name) {
+      const changes = []
+      if (selectedMaterial.quantity !== parseInt(materialForm.quantity)) changes.push(`quantity updated`)
+      if (selectedMaterial.location !== materialForm.location) changes.push(`location changed to ${materialForm.location}`)
+      
+      const updatedMaterial: Material = {
+        ...selectedMaterial,
+        name: materialForm.name,
+        category: materialForm.category,
+        quantity: parseInt(materialForm.quantity) || 0,
+        unit: materialForm.unit,
+        cost: parseInt(materialForm.cost) || 0,
+        supplier: materialForm.supplier,
+        location: materialForm.location,
+        reorderLevel: parseInt(materialForm.reorderLevel) || 0,
+        status: parseInt(materialForm.quantity) === 0 ? 'Out of Stock' : parseInt(materialForm.quantity) <= parseInt(materialForm.reorderLevel) ? 'Low Stock' : 'In Stock',
+        invoices: materialForm.invoices
+      }
+      
+      setMaterials(materials.map(m => m.id === selectedMaterial.id ? updatedMaterial : m))
+      
+      if (changes.length > 0) {
+        addTrackingLog('material', selectedMaterial.id, materialForm.name, 'Updated', `Material updated: ${changes.join(', ')}`)
+      }
+      
+      setShowEditMaterialModal(false)
+      setSelectedMaterial(null)
+      setMaterialForm({
+        name: '',
+        category: 'Chemicals',
+        quantity: '',
+        unit: 'piece',
+        cost: '',
+        supplier: '',
+        location: '',
+        reorderLevel: '',
+        invoices: [],
+        invoiceType: 'purchase',
+        invoiceFile: '',
+        invoiceAmount: '',
+        invoiceDate: ''
+      })
+    }
+  }
+
+  const handleDeleteMaterial = (id: number) => {
+    const material = materials.find(m => m.id === id)
+    if (material) {
+      addTrackingLog('material', id, material.name, 'Deleted', `Material removed from inventory`)
+    }
+    setMaterials(materials.filter(m => m.id !== id))
+  }
+
+  const openEditMaterialModal = (material: Material) => {
+    setSelectedMaterial(material)
+    setMaterialForm({
+      name: material.name,
+      category: material.category,
+      quantity: material.quantity.toString(),
+      unit: material.unit,
+      cost: material.cost.toString(),
+      supplier: material.supplier,
+      location: material.location,
+      reorderLevel: material.reorderLevel.toString(),
+      invoices: material.invoices,
+      invoiceType: 'purchase',
+      invoiceFile: '',
+      invoiceAmount: '',
+      invoiceDate: ''
+    })
+    setShowEditMaterialModal(true)
+  }
+
   const openEditEquipmentModal = (equip: any) => {
     setSelectedEquipment(equip)
     setEquipmentForm({
@@ -367,7 +559,17 @@ export default function EquipmentPermitsPage() {
       cost: equip.cost.toString(),
       quantity: equip.quantity.toString(),
       condition: equip.condition,
-      maintenanceDate: equip.maintenanceDate
+      maintenanceDate: equip.maintenanceDate,
+      invoices: equip.invoices || [],
+      materials: equip.materials || [],
+      invoiceType: 'repairing',
+      invoiceFile: '',
+      invoiceAmount: '',
+      invoiceDate: '',
+      materialName: '',
+      materialQuantity: '',
+      materialUnit: 'piece',
+      materialCost: ''
     })
     setShowEditEquipmentModal(true)
   }
@@ -502,6 +704,7 @@ export default function EquipmentPermitsPage() {
         {[
           { id: 'equipment', label: 'Equipment Inventory', icon: Wrench },
           { id: 'permits', label: 'Permits & Licenses', icon: ShieldCheck },
+          { id: 'materials', label: 'Materials', icon: ShoppingCart, badge: materials.filter(m => m.status === 'Low Stock' || m.status === 'Out of Stock').length },
           { id: 'reminders', label: 'Reminders', icon: Bell, badge: reminders.filter(r => r.status !== 'completed').length },
           { id: 'tracking', label: 'Activity Tracking', icon: History },
         ].map((tab) => (
@@ -562,11 +765,15 @@ export default function EquipmentPermitsPage() {
         </select>
 
         <button
-          onClick={() => activeTab === 'equipment' ? setShowAddEquipmentModal(true) : setShowAddPermitModal(true)}
+          onClick={() => {
+            if (activeTab === 'equipment') setShowAddEquipmentModal(true)
+            else if (activeTab === 'permits') setShowAddPermitModal(true)
+            else if (activeTab === 'materials') setShowAddMaterialModal(true)
+          }}
           className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
         >
           <Plus className="w-4 h-4" />
-          Add {activeTab === 'equipment' ? 'Equipment' : 'Permit'}
+          Add {activeTab === 'equipment' ? 'Equipment' : activeTab === 'permits' ? 'Permit' : 'Material'}
         </button>
       </div>
 
@@ -695,6 +902,70 @@ export default function EquipmentPermitsPage() {
                         </button>
                         <button
                           onClick={() => handleDeletePermit(item.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Materials Tab */}
+      {activeTab === 'materials' && (
+        <div className="bg-white border border-gray-300 rounded-3xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-300">
+                <tr>
+                  <th className="text-left px-6 py-4 text-sm font-bold text-gray-700">Material Name</th>
+                  <th className="text-left px-6 py-4 text-sm font-bold text-gray-700">Category</th>
+                  <th className="text-left px-6 py-4 text-sm font-bold text-gray-700">Quantity</th>
+                  <th className="text-left px-6 py-4 text-sm font-bold text-gray-700">Status</th>
+                  <th className="text-left px-6 py-4 text-sm font-bold text-gray-700">Unit Cost</th>
+                  <th className="text-left px-6 py-4 text-sm font-bold text-gray-700">Total Cost</th>
+                  <th className="text-left px-6 py-4 text-sm font-bold text-gray-700">Supplier</th>
+                  <th className="text-left px-6 py-4 text-sm font-bold text-gray-700">Location</th>
+                  <th className="text-center px-6 py-4 text-sm font-bold text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-300">
+                {materials.filter(m => 
+                  m.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                  (filterStatus === 'all' || m.status === filterStatus)
+                ).map((material) => (
+                  <tr key={material.id} className="hover:bg-gray-50 transition-all">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{material.name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{material.category}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{material.quantity} {material.unit}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        material.status === 'In Stock' ? 'bg-green-100 text-green-800 border border-green-300' :
+                        material.status === 'Low Stock' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
+                        'bg-red-100 text-red-800 border border-red-300'
+                      }`}>
+                        {material.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">AED {material.cost.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">AED {(material.quantity * material.cost).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{material.supplier}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{material.location}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => openEditMaterialModal(material)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMaterial(material.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -947,7 +1218,7 @@ export default function EquipmentPermitsPage() {
       {/* Add Equipment Modal */}
       {showAddEquipmentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-96 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900">Add New Equipment</h3>
               <button
@@ -958,85 +1229,278 @@ export default function EquipmentPermitsPage() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Equipment Name"
-                  value={equipmentForm.name}
-                  onChange={(e) => setEquipmentForm({...equipmentForm, name: e.target.value})}
-                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <select
-                  value={equipmentForm.category}
-                  onChange={(e) => setEquipmentForm({...equipmentForm, category: e.target.value})}
-                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="Cleaning">Cleaning</option>
-                  <option value="Safety">Safety</option>
-                  <option value="Access">Access</option>
-                  <option value="Outdoor">Outdoor</option>
-                  <option value="Other">Other</option>
-                </select>
+            <div className="space-y-6">
+              {/* Basic Information Section */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-indigo-600" />
+                  Basic Information
+                </h4>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="Equipment Name"
+                      value={equipmentForm.name}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, name: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <select
+                      value={equipmentForm.category}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, category: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="Cleaning">Cleaning</option>
+                      <option value="Safety">Safety</option>
+                      <option value="Access">Access</option>
+                      <option value="Outdoor">Outdoor</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="Location"
+                      value={equipmentForm.location}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, location: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Cost"
+                      value={equipmentForm.cost}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, cost: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <select
+                      value={equipmentForm.status}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, status: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="Available">Available</option>
+                      <option value="In Use">In Use</option>
+                      <option value="Maintenance">Maintenance</option>
+                    </select>
+                    <input
+                      type="number"
+                      placeholder="Quantity"
+                      value={equipmentForm.quantity}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, quantity: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <select
+                      value={equipmentForm.condition}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, condition: e.target.value})}
+                      className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="Excellent">Excellent</option>
+                      <option value="Good">Good</option>
+                      <option value="Fair">Fair</option>
+                      <option value="Poor">Poor</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={equipmentForm.maintenanceDate}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, maintenanceDate: e.target.value})}
+                      placeholder="Next Maintenance"
+                      className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Location"
-                  value={equipmentForm.location}
-                  onChange={(e) => setEquipmentForm({...equipmentForm, location: e.target.value})}
-                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <input
-                  type="number"
-                  placeholder="Cost"
-                  value={equipmentForm.cost}
-                  onChange={(e) => setEquipmentForm({...equipmentForm, cost: e.target.value})}
-                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              {/* Invoice Section */}
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-indigo-600" />
+                  Invoices
+                </h4>
+                
+                {/* Invoice List */}
+                {equipmentForm.invoices.length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    {equipmentForm.invoices.map((invoice, idx) => (
+                      <div key={invoice.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{invoice.type}</p>
+                          <p className="text-xs text-gray-600">{invoice.date} - AED {invoice.amount}</p>
+                        </div>
+                        <button
+                          onClick={() => setEquipmentForm({...equipmentForm, invoices: equipmentForm.invoices.filter((_, i) => i !== idx)})}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Invoice Form */}
+                <div className="space-y-3 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      value={equipmentForm.invoiceType}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, invoiceType: e.target.value})}
+                      className="px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="repairing">Repairing Invoice</option>
+                      <option value="maintenance">Maintenance Invoice</option>
+                      <option value="parts">Parts Invoice</option>
+                      <option value="service">Service Invoice</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={equipmentForm.invoiceDate}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, invoiceDate: e.target.value})}
+                      className="px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <input
+                    type="number"
+                    placeholder="Invoice Amount"
+                    value={equipmentForm.invoiceAmount}
+                    onChange={(e) => setEquipmentForm({...equipmentForm, invoiceAmount: e.target.value})}
+                    className="w-full px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+
+                  <input
+                    type="file"
+                    onChange={(e) => setEquipmentForm({...equipmentForm, invoiceFile: e.target.files?.[0]?.name || ''})}
+                    className="w-full px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                  />
+
+                  <button
+                    onClick={() => {
+                      if (equipmentForm.invoiceType && equipmentForm.invoiceDate && equipmentForm.invoiceAmount) {
+                        const newInvoice = {
+                          id: `inv${Date.now()}`,
+                          type: equipmentForm.invoiceType,
+                          file: equipmentForm.invoiceFile,
+                          date: equipmentForm.invoiceDate,
+                          amount: equipmentForm.invoiceAmount
+                        }
+                        setEquipmentForm({
+                          ...equipmentForm,
+                          invoices: [...equipmentForm.invoices, newInvoice],
+                          invoiceType: 'repairing',
+                          invoiceFile: '',
+                          invoiceAmount: '',
+                          invoiceDate: ''
+                        })
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium"
+                  >
+                    Add Invoice
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <select
-                  value={equipmentForm.status}
-                  onChange={(e) => setEquipmentForm({...equipmentForm, status: e.target.value})}
-                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="Available">Available</option>
-                  <option value="In Use">In Use</option>
-                  <option value="Maintenance">Maintenance</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="Quantity"
-                  value={equipmentForm.quantity}
-                  onChange={(e) => setEquipmentForm({...equipmentForm, quantity: e.target.value})}
-                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              {/* Materials Section */}
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <ShoppingCart className="w-4 h-4 text-indigo-600" />
+                  Materials
+                </h4>
+                
+                {/* Materials List */}
+                {equipmentForm.materials.length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    {equipmentForm.materials.map((material, idx) => (
+                      <div key={material.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{material.name}</p>
+                          <p className="text-xs text-gray-600">{material.quantity} {material.unit} - AED {material.cost}</p>
+                        </div>
+                        <button
+                          onClick={() => setEquipmentForm({...equipmentForm, materials: equipmentForm.materials.filter((_, i) => i !== idx)})}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Material Form */}
+                <div className="space-y-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                  <input
+                    type="text"
+                    placeholder="Material Name"
+                    value={equipmentForm.materialName}
+                    onChange={(e) => setEquipmentForm({...equipmentForm, materialName: e.target.value})}
+                    className="w-full px-3 py-2 text-sm border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <input
+                      type="number"
+                      placeholder="Quantity"
+                      value={equipmentForm.materialQuantity}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, materialQuantity: e.target.value})}
+                      className="px-3 py-2 text-sm border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <select
+                      value={equipmentForm.materialUnit}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, materialUnit: e.target.value})}
+                      className="px-3 py-2 text-sm border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    >
+                      <option value="piece">Piece</option>
+                      <option value="kg">KG</option>
+                      <option value="liter">Liter</option>
+                      <option value="meter">Meter</option>
+                      <option value="box">Box</option>
+                    </select>
+                    <input
+                      type="number"
+                      placeholder="Cost"
+                      value={equipmentForm.materialCost}
+                      onChange={(e) => setEquipmentForm({...equipmentForm, materialCost: e.target.value})}
+                      className="px-3 py-2 text-sm border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (equipmentForm.materialName && equipmentForm.materialQuantity && equipmentForm.materialCost) {
+                        const newMaterial = {
+                          id: `mat${Date.now()}`,
+                          name: equipmentForm.materialName,
+                          quantity: equipmentForm.materialQuantity,
+                          unit: equipmentForm.materialUnit,
+                          cost: equipmentForm.materialCost
+                        }
+                        setEquipmentForm({
+                          ...equipmentForm,
+                          materials: [...equipmentForm.materials, newMaterial],
+                          materialName: '',
+                          materialQuantity: '',
+                          materialUnit: 'piece',
+                          materialCost: ''
+                        })
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all font-medium"
+                  >
+                    Add Material
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <select
-                  value={equipmentForm.condition}
-                  onChange={(e) => setEquipmentForm({...equipmentForm, condition: e.target.value})}
-                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="Excellent">Excellent</option>
-                  <option value="Good">Good</option>
-                  <option value="Fair">Fair</option>
-                  <option value="Poor">Poor</option>
-                </select>
-                <input
-                  type="date"
-                  value={equipmentForm.maintenanceDate}
-                  onChange={(e) => setEquipmentForm({...equipmentForm, maintenanceDate: e.target.value})}
-                  placeholder="Next Maintenance"
-                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="flex items-center gap-3 pt-4">
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-4 border-t">
                 <button
                   onClick={() => setShowAddEquipmentModal(false)}
                   className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all"
@@ -1356,6 +1820,414 @@ export default function EquipmentPermitsPage() {
                 </button>
                 <button
                   onClick={handleEditPermit}
+                  className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Material Modal */}
+      {showAddMaterialModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-screen overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Add New Material</h3>
+              <button
+                onClick={() => setShowAddMaterialModal(false)}
+                className="p-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Material Name"
+                  value={materialForm.name}
+                  onChange={(e) => setMaterialForm({...materialForm, name: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <select
+                  value={materialForm.category}
+                  onChange={(e) => setMaterialForm({...materialForm, category: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="Chemicals">Chemicals</option>
+                  <option value="Textiles">Textiles</option>
+                  <option value="PPE">PPE</option>
+                  <option value="Equipment">Equipment</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="number"
+                  placeholder="Quantity"
+                  value={materialForm.quantity}
+                  onChange={(e) => setMaterialForm({...materialForm, quantity: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <select
+                  value={materialForm.unit}
+                  onChange={(e) => setMaterialForm({...materialForm, unit: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="piece">Piece</option>
+                  <option value="kg">KG</option>
+                  <option value="liter">Liter</option>
+                  <option value="meter">Meter</option>
+                  <option value="box">Box</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="number"
+                  placeholder="Unit Cost (AED)"
+                  value={materialForm.cost}
+                  onChange={(e) => setMaterialForm({...materialForm, cost: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Supplier"
+                  value={materialForm.supplier}
+                  onChange={(e) => setMaterialForm({...materialForm, supplier: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Location"
+                  value={materialForm.location}
+                  onChange={(e) => setMaterialForm({...materialForm, location: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <input
+                  type="number"
+                  placeholder="Reorder Level"
+                  value={materialForm.reorderLevel}
+                  onChange={(e) => setMaterialForm({...materialForm, reorderLevel: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Invoice Section */}
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-indigo-600" />
+                  Invoices
+                </h4>
+                
+                {/* Invoice List */}
+                {materialForm.invoices.length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    {materialForm.invoices.map((invoice, idx) => (
+                      <div key={invoice.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{invoice.type}</p>
+                          <p className="text-xs text-gray-600">{invoice.date} - AED {invoice.amount}</p>
+                        </div>
+                        <button
+                          onClick={() => setMaterialForm({...materialForm, invoices: materialForm.invoices.filter((_, i) => i !== idx)})}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Invoice Form */}
+                <div className="space-y-3 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      value={materialForm.invoiceType}
+                      onChange={(e) => setMaterialForm({...materialForm, invoiceType: e.target.value})}
+                      className="px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="purchase">Purchase Invoice</option>
+                      <option value="delivery">Delivery Invoice</option>
+                      <option value="quality">Quality Check</option>
+                      <option value="warranty">Warranty Invoice</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={materialForm.invoiceDate}
+                      onChange={(e) => setMaterialForm({...materialForm, invoiceDate: e.target.value})}
+                      className="px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <input
+                    type="number"
+                    placeholder="Invoice Amount"
+                    value={materialForm.invoiceAmount}
+                    onChange={(e) => setMaterialForm({...materialForm, invoiceAmount: e.target.value})}
+                    className="w-full px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+
+                  <input
+                    type="file"
+                    onChange={(e) => setMaterialForm({...materialForm, invoiceFile: e.target.files?.[0]?.name || ''})}
+                    className="w-full px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                  />
+
+                  <button
+                    onClick={() => {
+                      if (materialForm.invoiceType && materialForm.invoiceDate && materialForm.invoiceAmount) {
+                        const newInvoice = {
+                          id: `inv${Date.now()}`,
+                          type: materialForm.invoiceType,
+                          file: materialForm.invoiceFile,
+                          date: materialForm.invoiceDate,
+                          amount: materialForm.invoiceAmount
+                        }
+                        setMaterialForm({
+                          ...materialForm,
+                          invoices: [...materialForm.invoices, newInvoice],
+                          invoiceType: 'purchase',
+                          invoiceFile: '',
+                          invoiceAmount: '',
+                          invoiceDate: ''
+                        })
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium"
+                  >
+                    Add Invoice
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-4">
+                <button
+                  onClick={() => setShowAddMaterialModal(false)}
+                  className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddMaterial}
+                  className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                >
+                  Add Material
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Material Modal */}
+      {showEditMaterialModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-screen overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Edit Material</h3>
+              <button
+                onClick={() => {
+                  setShowEditMaterialModal(false);
+                  setSelectedMaterial(null);
+                }}
+                className="p-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Material Name"
+                  value={materialForm.name}
+                  onChange={(e) => setMaterialForm({...materialForm, name: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <select
+                  value={materialForm.category}
+                  onChange={(e) => setMaterialForm({...materialForm, category: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="Chemicals">Chemicals</option>
+                  <option value="Textiles">Textiles</option>
+                  <option value="PPE">PPE</option>
+                  <option value="Equipment">Equipment</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="number"
+                  placeholder="Quantity"
+                  value={materialForm.quantity}
+                  onChange={(e) => setMaterialForm({...materialForm, quantity: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <select
+                  value={materialForm.unit}
+                  onChange={(e) => setMaterialForm({...materialForm, unit: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="piece">Piece</option>
+                  <option value="kg">KG</option>
+                  <option value="liter">Liter</option>
+                  <option value="meter">Meter</option>
+                  <option value="box">Box</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="number"
+                  placeholder="Unit Cost (AED)"
+                  value={materialForm.cost}
+                  onChange={(e) => setMaterialForm({...materialForm, cost: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Supplier"
+                  value={materialForm.supplier}
+                  onChange={(e) => setMaterialForm({...materialForm, supplier: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Location"
+                  value={materialForm.location}
+                  onChange={(e) => setMaterialForm({...materialForm, location: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <input
+                  type="number"
+                  placeholder="Reorder Level"
+                  value={materialForm.reorderLevel}
+                  onChange={(e) => setMaterialForm({...materialForm, reorderLevel: e.target.value})}
+                  className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Invoice Section */}
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-indigo-600" />
+                  Invoices
+                </h4>
+                
+                {/* Invoice List */}
+                {materialForm.invoices.length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    {materialForm.invoices.map((invoice, idx) => (
+                      <div key={invoice.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{invoice.type}</p>
+                          <p className="text-xs text-gray-600">{invoice.date} - AED {invoice.amount}</p>
+                        </div>
+                        <button
+                          onClick={() => setMaterialForm({...materialForm, invoices: materialForm.invoices.filter((_, i) => i !== idx)})}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Invoice Form */}
+                <div className="space-y-3 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      value={materialForm.invoiceType}
+                      onChange={(e) => setMaterialForm({...materialForm, invoiceType: e.target.value})}
+                      className="px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="purchase">Purchase Invoice</option>
+                      <option value="delivery">Delivery Invoice</option>
+                      <option value="quality">Quality Check</option>
+                      <option value="warranty">Warranty Invoice</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={materialForm.invoiceDate}
+                      onChange={(e) => setMaterialForm({...materialForm, invoiceDate: e.target.value})}
+                      className="px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <input
+                    type="number"
+                    placeholder="Invoice Amount"
+                    value={materialForm.invoiceAmount}
+                    onChange={(e) => setMaterialForm({...materialForm, invoiceAmount: e.target.value})}
+                    className="w-full px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+
+                  <input
+                    type="file"
+                    onChange={(e) => setMaterialForm({...materialForm, invoiceFile: e.target.files?.[0]?.name || ''})}
+                    className="w-full px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                  />
+
+                  <button
+                    onClick={() => {
+                      if (materialForm.invoiceType && materialForm.invoiceDate && materialForm.invoiceAmount) {
+                        const newInvoice = {
+                          id: `inv${Date.now()}`,
+                          type: materialForm.invoiceType,
+                          file: materialForm.invoiceFile,
+                          date: materialForm.invoiceDate,
+                          amount: materialForm.invoiceAmount
+                        }
+                        setMaterialForm({
+                          ...materialForm,
+                          invoices: [...materialForm.invoices, newInvoice],
+                          invoiceType: 'purchase',
+                          invoiceFile: '',
+                          invoiceAmount: '',
+                          invoiceDate: ''
+                        })
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium"
+                  >
+                    Add Invoice
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowEditMaterialModal(false);
+                    setSelectedMaterial(null);
+                  }}
+                  className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditMaterial}
                   className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
                 >
                   Save Changes
