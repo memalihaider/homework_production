@@ -8,10 +8,6 @@ import {
 } from 'lucide-react'
 import { motion, useTransform, useMotionValue, useSpring, useScroll } from 'framer-motion'
 import { useRef, useEffect, useState, useMemo } from 'react'
-import dynamic from 'next/dynamic'
-
-// Lazy load heavy components
-const CustomCursor = dynamic(() => import('@/components/CustomCursor').then(mod => ({ default: mod.default })), { ssr: false })
 
 // Reusable CTA Button Component
 interface CTAButtonProps {
@@ -1072,7 +1068,7 @@ export default function HomePage() {
               </motion.div>
               <div className="flex flex-wrap justify-center gap-6">
                 <motion.a 
-                  href="/booking" 
+                  href="/book-service" 
                   className="bg-primary text-white px-12 py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/40 hover:bg-pink-700 transition-all inline-flex items-center gap-3 hover:shadow-primary/60"
                   whileHover={{ scale: 1.08, y: -2 }}
                   whileTap={{ scale: 0.95 }}
