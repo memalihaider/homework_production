@@ -1,10 +1,22 @@
 "use client"
 
 import { motion } from 'framer-motion'
-import { Plus, Minus, HelpCircle } from 'lucide-react'
-import { useState } from 'react'
+import { Plus, Minus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { db } from '@/lib/firebase'
+import { collection, getDocs } from 'firebase/firestore'
 
-const faqs = [
+// Firebase FAQ Type
+type FirebaseFAQ = {
+  id: string;
+  question: string;
+  answer: string;
+  category?: string;
+  order?: number;
+}
+
+// Static FAQs (unchanged)
+const staticFAQs = [
   {
     question: "1. What services does Homework Cleaning Services offer in the UAE?",
     answer: "We specialize in professional cleaning services for homes and offices, including Regular home cleaning, Deep cleaning, Move-in/move-out cleaning, Office cleaning, Kitchen and bathroom cleaning, Upholstery and carpet cleaning, Yacht Cleaning, Aeroplane Cleaning, and After Event and Exhibition cleaning. Our services are customizable to meet your specific needs."
@@ -34,7 +46,7 @@ const faqs = [
     answer: "Yes, we offer flexible booking options including one-time deep cleans, move-in/out services, or event-based cleaning, as well as recurring weekly or monthly maintenance plans."
   },
   {
-    question: "8. What happens if I’m not satisfied with the cleaning?",
+    question: "8. What happens if I'm not satisfied with the cleaning?",
     answer: "Customer satisfaction is our top priority. If you are not completely satisfied with any area we have cleaned, please notify us within 24 hours, and we will send a team back to reclean the area at no additional cost."
   },
   {
@@ -65,6 +77,62 @@ const faqs = [
 
 export default function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0)
+  const [firebaseFAQs, setFirebaseFAQs] = useState<FirebaseFAQ[]>([])
+
+  // Fetch FAQs from Firebase
+  useEffect(() => {
+    const fetchFAQs = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'faq'))
+        const faqsData: FirebaseFAQ[] = []
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          faqsData.push({
+            id: doc.id,
+            question: data.question || '',
+            answer: data.answer || '',
+            category: data.category || 'General',
+            order: data.order || 0
+          })
+        })
+        
+        // Sort by order then by question
+        const sortedFAQs = faqsData.sort((a, b) => {
+          if (a.order !== b.order) return (a.order || 0) - (b.order || 0)
+          return a.question.localeCompare(b.question)
+        })
+        
+        setFirebaseFAQs(sortedFAQs)
+      } catch (error) {
+        console.error('Error fetching FAQs:', error)
+        // Error handle silently, UI will still show static FAQs
+      }
+    }
+
+    fetchFAQs()
+  }, [])
+
+  // Process Firebase FAQs to match static FAQ format
+  const processedFirebaseFAQs = firebaseFAQs.map((faq, index) => ({
+    question: `${staticFAQs.length + index + 1}. ${formatQuestion(faq.question)}`,
+    answer: faq.answer
+  }))
+
+  // Helper function to format question
+  function formatQuestion(question: string): string {
+    // Add question mark if missing
+    if (!question.trim().endsWith('?')) {
+      return question.trim() + '?'
+    }
+    return question.trim()
+  }
+
+  // Combine static and Firebase FAQs
+  const allFAQs = [
+    ...staticFAQs,
+    ...processedFirebaseFAQs
+  ]
 
   return (
     <div className="flex flex-col overflow-hidden pt-20">
@@ -87,7 +155,7 @@ export default function FAQ() {
           </motion.div>
 
           <div className="max-w-4xl mx-auto">
-            {faqs.map((faq, i) => (
+            {allFAQs.map((faq, i) => (
               <motion.div 
                 key={i}
                 initial={{ opacity: 0, y: 10 }}

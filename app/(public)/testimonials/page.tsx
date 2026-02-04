@@ -2,8 +2,35 @@
 
 import { motion } from 'framer-motion'
 import { Star, Quote, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { db } from '@/lib/firebase'
+import { collection, getDocs } from 'firebase/firestore'
 
-const testimonials = [
+// Firebase Testimonial Type
+type FirebaseTestimonial = {
+  id: string;
+  name: string;
+  description: string;
+  rating: number;
+  imageURL?: string;
+  location?: string;
+  role?: string;
+  featured?: boolean;
+  createdAt?: any;
+}
+
+// Define proper type for combined testimonials
+type TestimonialItem = {
+  name: string;
+  role: string;
+  content: string;
+  rating: number;
+  imageURL?: string;  // Make imageURL optional
+  isFirebase: boolean;
+}
+
+// Original dummy testimonials (unchanged)
+const staticTestimonials: Omit<TestimonialItem, 'isFirebase'>[] = [
   {
     name: "Fatima Al Suwaidi",
     role: "Villa Owner, Jumeirah",
@@ -103,6 +130,79 @@ const testimonials = [
 ]
 
 export default function Testimonials() {
+  const [firebaseTestimonials, setFirebaseTestimonials] = useState<FirebaseTestimonial[]>([])
+
+  // Fetch testimonials from Firebase
+  useEffect(() => {
+    const fetchTestimonials = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'testimonials'))
+        const testimonialsData: FirebaseTestimonial[] = []
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          testimonialsData.push({
+            id: doc.id,
+            name: data.name || '',
+            description: data.description || '',
+            rating: data.rating || 5,
+            imageURL: data.imageURL,
+            location: data.location,
+            role: data.location ? `${data.location}` : 'Client',
+            featured: data.featured || false
+          })
+        })
+        
+        // Sort by featured first, then by name
+        const sortedTestimonials = testimonialsData.sort((a, b) => {
+          if (a.featured && !b.featured) return -1
+          if (!a.featured && b.featured) return 1
+          return a.name.localeCompare(b.name)
+        })
+        
+        setFirebaseTestimonials(sortedTestimonials)
+      } catch (error) {
+        console.error('Error fetching testimonials:', error)
+        // Error handle silently, UI will still show static testimonials
+      }
+    }
+
+    fetchTestimonials()
+  }, [])
+
+  // Combine static and Firebase testimonials with proper typing
+  const allTestimonials: TestimonialItem[] = [
+    // Featured Firebase testimonials first
+    ...firebaseTestimonials
+      .filter(t => t.featured)
+      .map(t => ({
+        name: t.name,
+        role: t.role || 'Client',
+        content: t.description,
+        rating: t.rating,
+        imageURL: t.imageURL,  // Include imageURL
+        isFirebase: true
+      })),
+    
+    // Static testimonials
+    ...staticTestimonials.map(t => ({
+      ...t,
+      isFirebase: false
+    })),
+    
+    // Non-featured Firebase testimonials
+    ...firebaseTestimonials
+      .filter(t => !t.featured)
+      .map(t => ({
+        name: t.name,
+        role: t.role || 'Client',
+        content: t.description,
+        rating: t.rating,
+        imageURL: t.imageURL,  // Include imageURL
+        isFirebase: true
+      }))
+  ]
+
   return (
     <div className="flex flex-col overflow-hidden pt-20">
       <section className="py-24 bg-slate-50">
@@ -120,23 +220,33 @@ export default function Testimonials() {
             </h1>
             <p className="text-xl text-slate-600 font-medium">
               Join thousands of satisfied premium clients who trust Homework UAE for their hygiene needs.
+             
             </p>
           </motion.div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {testimonials.map((t, i) => (
+            {allTestimonials.map((t, i) => (
               <motion.div
-                key={i}
+                key={t.isFirebase ? `firebase-${i}` : `static-${i}`}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="bg-white p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between"
+                className={`bg-white p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between ${
+                  t.isFirebase ? 'relative' : ''
+                }`}
               >
+                {/* Firebase Badge - Only show for Firebase testimonials */}
+                {t.isFirebase && (
+                  <div className="absolute -top-2 -right-2">
+                   
+                  </div>
+                )}
+
                 <div>
                   <div className="flex gap-1 mb-6">
-                    {[...Array(t.rating)].map((_, i) => (
-                      <Star key={i} className="h-4 w-4 fill-primary text-primary" />
+                    {[...Array(Math.min(Math.max(t.rating, 1), 5))].map((_, starIndex) => (
+                      <Star key={starIndex} className="h-4 w-4 fill-primary text-primary" />
                     ))}
                   </div>
                   <Quote className="h-10 w-10 text-primary/10 mb-6" />
@@ -146,9 +256,26 @@ export default function Testimonials() {
                 </div>
                 
                 <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                    <User className="h-6 w-6" />
-                  </div>
+                  {t.isFirebase && t.imageURL ? (
+                    <div className="h-12 w-12 rounded-full overflow-hidden border-2 border-white shadow-md">
+                      <img 
+                        src={t.imageURL} 
+                        alt={t.name}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          // Fallback to User icon if image fails to load
+                          const parent = e.currentTarget.parentElement
+                          if (parent) {
+                            parent.innerHTML = '<div class="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"><svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>'
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                      <User className="h-6 w-6" />
+                    </div>
+                  )}
                   <div>
                     <h4 className="font-black text-slate-900">{t.name}</h4>
                     <p className="text-sm text-slate-500 font-bold">{t.role}</p>
