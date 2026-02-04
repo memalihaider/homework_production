@@ -27,7 +27,7 @@ import {
   LineChart,
   Line
 } from 'recharts';
-import { getStoredSession, type UserSession } from '@/lib/auth';
+import { getSession, type SessionData } from '@/lib/auth';
 
 const dailyReportData = [
   { date: 'Jan 25', completed: 12, inProgress: 8, pending: 2 },
@@ -86,13 +86,13 @@ const reports = [
 
 export default function ReportsPage() {
   const router = useRouter();
-  const [session, setSession] = useState<UserSession | null>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
-    if (!storedSession || storedSession.portal !== 'supervisor') {
+    const storedSession = getSession();
+    if (!storedSession) {
       router.push('/login/supervisor');
       return;
     }

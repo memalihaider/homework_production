@@ -17,7 +17,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
-import { getStoredSession, type UserSession } from '@/lib/auth';
+import { getSession, type SessionData } from '@/lib/auth';
 import { EmployeeSidebar } from '../_components/sidebar';
 
 interface Task {
@@ -149,7 +149,7 @@ const mockTasksData: Task[] = [
 
 export default function EmployeeTasksPage() {
   const router = useRouter();
-  const [session, setSession] = useState<UserSession | null>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(mockTasksData);
   const [searchTerm, setSearchTerm] = useState('');
@@ -159,8 +159,8 @@ export default function EmployeeTasksPage() {
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
-    if (!storedSession || storedSession.portal !== 'employee') {
+    const storedSession = getSession();
+    if (!storedSession) {
       router.push('/login/employee');
       return;
     }

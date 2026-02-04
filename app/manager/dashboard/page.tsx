@@ -48,7 +48,25 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { getStoredSession, type UserSession } from '@/lib/auth';
+
+// Temporary function to replace getStoredSession
+const getSessionData = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const session = localStorage.getItem('manager_session');
+    return session ? JSON.parse(session) : null;
+  } catch {
+    return null;
+  }
+};
+
+type UserSession = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  portal: 'manager' | 'guest' | 'employee' | 'supervisor';
+};
 
 // Mock data for manager dashboard
 const teamPerformanceData = [
@@ -110,7 +128,7 @@ export default function ManagerDashboard() {
   ]);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
+    const storedSession = getSessionData();
     if (!storedSession || storedSession.portal !== 'manager') {
       router.push('/login/manager');
       return;

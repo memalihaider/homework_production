@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ManagerSidebar } from '../_components/sidebar';
-import { getStoredSession, clearSession, type UserSession } from '@/lib/auth';
-import { Users, Mail, Phone, Briefcase, Clock, AlertCircle, UserPlus, MoreVertical, Badge } from 'lucide-react';
+import { getSession, clearSession, type SessionData } from '@/lib/auth';
+import { Users, Mail, Phone, Briefcase, Clock, AlertCircle, UserPlus, MoreVertical, Badge, Menu, X } from 'lucide-react';
 
 const teamMembers = [
   { id: '1', name: 'Ahmed Hassan', role: 'Senior Technician', email: 'ahmed.hassan@homeware.ae', phone: '+971501234567', department: 'Operations', status: 'active', joinDate: '2023-06-15', currentJob: 'JOB-2024-001', hoursWorked: 168 },
@@ -17,14 +17,14 @@ const teamMembers = [
 
 export default function TeamManagement() {
   const router = useRouter();
-  const [session, setSession] = useState<UserSession | null>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedTeamMember, setSelectedTeamMember] = useState<typeof teamMembers[0] | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'on-leave'>('all');
 
   useEffect(() => {
-    const storedSession = getStoredSession();
-    if (!storedSession || storedSession.portal !== 'manager') {
+    const storedSession = getSession();
+    if (!storedSession) {
       router.push('/login/manager');
       return;
     }
@@ -233,5 +233,3 @@ export default function TeamManagement() {
     </div>
   );
 }
-
-import { Menu, X } from 'lucide-react';

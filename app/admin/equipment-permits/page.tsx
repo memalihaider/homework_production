@@ -29,8 +29,6 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
-  query, 
-  where, 
   Timestamp 
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -77,7 +75,7 @@ type Reminder = {
 
 type TrackingLog = {
   id: string
-  type: 'equipment' | 'permit' | 'material'
+  type: 'equipment' | 'permit' | 'material' | 'reminder'
   itemId: string
   itemName: string
   action: string
@@ -85,7 +83,7 @@ type TrackingLog = {
   timestamp: string
   details: string
   createdAt: Timestamp
-  date: string // Added date field for filtering
+  date: string
 }
 
 type Material = {
@@ -109,7 +107,11 @@ export default function EquipmentPermitsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [showReminderModal, setShowReminderModal] = useState(false)
-  const [selectedItemForReminder, setSelectedItemForReminder] = useState<any>(null)
+  const [selectedItemForReminder, setSelectedItemForReminder] = useState<{
+    type: 'equipment' | 'permit' | 'material'
+    id: string
+    name: string
+  } | null>(null)
   
   // States for Firebase data
   const [equipment, setEquipment] = useState<Equipment[]>([])
@@ -236,7 +238,7 @@ export default function EquipmentPermitsPage() {
         return {
           id: doc.id,
           ...data,
-          date: date || getTodayDate() // Default to today if no date found
+          date: date || getTodayDate()
         }
       }) as TrackingLog[]
       
@@ -265,7 +267,7 @@ export default function EquipmentPermitsPage() {
 
   // Log tracking action with proper date
   const addTrackingLog = async (
-    type: 'equipment' | 'permit' | 'material', 
+    type: 'equipment' | 'permit' | 'material' | 'reminder', 
     itemId: string, 
     itemName: string, 
     action: string, 
@@ -283,7 +285,7 @@ export default function EquipmentPermitsPage() {
         user: 'Admin User',
         timestamp: timestamp,
         details,
-        date: today, // Add date field for filtering
+        date: today,
         createdAt: Timestamp.now()
       }
       
@@ -427,7 +429,7 @@ export default function EquipmentPermitsPage() {
           itemName: selectedItemForReminder.name,
           reminderType,
           dueDate,
-          status: 'pending' as 'pending',
+          status: 'pending' as const,
           message,
           createdAt: getTodayDate()
         }
@@ -441,7 +443,7 @@ export default function EquipmentPermitsPage() {
           ...newReminder
         }])
 
-        // Tracking log add karna
+        // Tracking log add karna - FIXED TYPE ERROR
         await addTrackingLog('reminder', docRef.id, newReminder.itemName, 'Reminder Added', 
           `Reminder set for ${selectedItemForReminder.type}: ${newReminder.message}`)
 
@@ -805,6 +807,19 @@ export default function EquipmentPermitsPage() {
     return reminder.createdAt === getTodayDate()
   })
 
+  // Reminder modal ke form values get karne ka function
+  const getReminderFormValues = () => {
+    const reminderTypeElement = document.getElementById('reminderType') as HTMLSelectElement
+    const dueDateElement = document.getElementById('dueDate') as HTMLInputElement
+    const reminderMessageElement = document.getElementById('reminderMessage') as HTMLTextAreaElement
+    
+    return {
+      reminderType: reminderTypeElement ? reminderTypeElement.value as 'maintenance' | 'expiry' | 'renewal' | 'restock' : 'maintenance',
+      dueDate: dueDateElement ? dueDateElement.value : '',
+      message: reminderMessageElement ? reminderMessageElement.value : ''
+    }
+  }
+
   return (
     <div className="min-h-screen bg-white text-gray-900 p-6 space-y-8">
       {/* Header */}
@@ -823,7 +838,7 @@ export default function EquipmentPermitsPage() {
       {/* Summary Cards - Updated with Reminder Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {/* Equipment Card */}
-        <div className="bg-linear-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-blue-100 rounded-lg">
               <Wrench className="w-4 h-4 text-blue-600" />
@@ -845,7 +860,7 @@ export default function EquipmentPermitsPage() {
         </div>
 
         {/* Permits Card */}
-        <div className="bg-linear-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6">
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-green-100 rounded-lg">
               <ShieldCheck className="w-4 h-4 text-green-600" />
@@ -867,7 +882,7 @@ export default function EquipmentPermitsPage() {
         </div>
 
         {/* In Use Equipment Card */}
-        <div className="bg-linear-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-6">
+        <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-orange-100 rounded-lg">
               <AlertCircle className="w-4 h-4 text-orange-600" />
@@ -879,7 +894,7 @@ export default function EquipmentPermitsPage() {
         </div>
 
         {/* Expiring Soon Card - Updated */}
-        <div className="bg-linear-to-br from-red-50 to-pink-50 border border-red-200 rounded-2xl p-6">
+        <div className="bg-gradient-to-br from-red-50 to-pink-50 border border-red-200 rounded-2xl p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-red-100 rounded-lg">
               <AlertTriangle className="w-4 h-4 text-red-600" />
@@ -896,7 +911,7 @@ export default function EquipmentPermitsPage() {
         </div>
 
         {/* Total Value Card */}
-        <div className="bg-linear-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-6">
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-purple-100 rounded-lg">
               <DollarSign className="w-4 h-4 text-purple-600" />
@@ -1500,11 +1515,9 @@ export default function EquipmentPermitsPage() {
                 </button>
                 <button
                   onClick={() => {
-                    const reminderType = (document.getElementById('reminderType') as HTMLSelectElement).value as any
-                    const dueDate = (document.getElementById('dueDate') as HTMLInputElement).value
-                    const message = (document.getElementById('reminderMessage') as HTMLTextAreaElement).value
-                    if (dueDate) {
-                      handleAddReminder(reminderType, dueDate, message)
+                    const formValues = getReminderFormValues()
+                    if (formValues.dueDate) {
+                      handleAddReminder(formValues.reminderType, formValues.dueDate, formValues.message)
                     }
                   }}
                   className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"

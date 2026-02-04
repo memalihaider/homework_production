@@ -13,7 +13,25 @@ import {
   Filter,
   X
 } from 'lucide-react';
-import { getStoredSession, type UserSession } from '@/lib/auth';
+
+// Temporary function to replace getStoredSession
+const getSessionData = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const session = localStorage.getItem('supervisor_session');
+    return session ? JSON.parse(session) : null;
+  } catch {
+    return null;
+  }
+};
+
+type UserSession = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  portal: 'manager' | 'guest' | 'employee' | 'supervisor';
+};
 
 const initialApprovals = [
   { id: 'APR-001', type: 'Overtime', requester: 'Ahmed Hassan', details: '3 hours for JOB-2024-001', requestDate: '2024-01-29', icon: Clock, color: 'bg-orange-100', textColor: 'text-orange-600' },
@@ -31,7 +49,7 @@ export default function ApprovalsPage() {
   const [selectedType, setSelectedType] = useState<string | null>(null);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
+    const storedSession = getSessionData();
     if (!storedSession || storedSession.portal !== 'supervisor') {
       router.push('/login/supervisor');
       return;

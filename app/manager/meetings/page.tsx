@@ -3,8 +3,26 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ManagerSidebar } from '../_components/sidebar';
-import { getStoredSession, type UserSession } from '@/lib/auth';
 import { Calendar, Clock, Users, MapPin, Plus, Menu, X, Video, MapPinIcon } from 'lucide-react';
+
+// Temporary function to replace getStoredSession
+const getSessionData = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const session = localStorage.getItem('manager_session');
+    return session ? JSON.parse(session) : null;
+  } catch {
+    return null;
+  }
+};
+
+type UserSession = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  portal: 'manager' | 'guest' | 'employee' | 'supervisor';
+};
 
 const meetings = [
   { id: '1', title: 'Team Weekly Standup', date: '2024-02-01', time: '09:00 AM', duration: '30 mins', location: 'Conference Room A', attendees: ['Ahmed Hassan', 'Sara Al Maktoum', 'Mohammed Ali', 'Omar Rashid', 'Layla Mansour'], type: 'in-person', status: 'scheduled' },
@@ -22,7 +40,7 @@ export default function Meetings() {
   const [filterType, setFilterType] = useState<'all' | 'in-person' | 'virtual'>('all');
 
   useEffect(() => {
-    const storedSession = getStoredSession();
+    const storedSession = getSessionData();
     if (!storedSession || storedSession.portal !== 'manager') {
       router.push('/login/manager');
       return;

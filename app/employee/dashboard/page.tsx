@@ -18,7 +18,7 @@ import {
   Calendar
 } from 'lucide-react';
 import Link from 'next/link';
-import { getStoredSession, clearSession, type UserSession } from '@/lib/auth';
+import { getSession, clearSession, type SessionData } from '@/lib/auth';
 import { EmployeeSidebar } from '../_components/sidebar';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -163,7 +163,7 @@ const jobStatusData = [
 
 export default function EmployeeDashboard() {
   const router = useRouter();
-  const [session, setSession] = useState<UserSession | null>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -171,8 +171,8 @@ export default function EmployeeDashboard() {
   const [tasks, setTasks] = useState<Task[]>(mockTasksData);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
-    if (!storedSession || storedSession.portal !== 'employee') {
+    const storedSession = getSession();
+    if (!storedSession) {
       router.push('/login/employee');
       return;
     }

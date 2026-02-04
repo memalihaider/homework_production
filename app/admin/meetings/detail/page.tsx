@@ -311,13 +311,15 @@ export default function MeetingDetail() {
     return baseAgenda
   }
 
-  // Get accountability tracking info
+  // Get accountability tracking info - FIXED TYPE ERROR
   const getAccountabilityInfo = () => {
-    if (!selectedMeeting) return {
-      createdBy: 'Admin',
-      createdDate: selectedMeeting?.createdAt?.split('T')[0] || 'N/A',
-      owner: selectedMeeting?.attendeeNames[0] || 'Host',
-      stakeholders: selectedMeeting?.attendeeNames || []
+    if (!selectedMeeting) {
+      return {
+        createdBy: 'Admin',
+        createdDate: 'N/A',
+        owner: 'Host',
+        stakeholders: []
+      }
     }
     
     return {
@@ -560,22 +562,22 @@ export default function MeetingDetail() {
 
       {/* Meeting Status Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-linear-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
           <p className="text-xs text-muted-foreground mb-1">Total Meetings</p>
           <p className="text-3xl font-black text-blue-700">{meetings.length}</p>
           <p className="text-xs text-blue-600 mt-1">All meetings</p>
         </div>
-        <div className="bg-linear-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg p-4">
+        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg p-4">
           <p className="text-xs text-muted-foreground mb-1">Pending (Scheduled)</p>
           <p className="text-3xl font-black text-yellow-700">{pendingMeetings.length}</p>
           <p className="text-xs text-yellow-600 mt-1">Awaiting</p>
         </div>
-        <div className="bg-linear-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-lg p-4">
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-lg p-4">
           <p className="text-xs text-muted-foreground mb-1">In Progress</p>
           <p className="text-3xl font-black text-orange-700">{inProgressMeetings.length}</p>
           <p className="text-xs text-orange-600 mt-1">Ongoing</p>
         </div>
-        <div className="bg-linear-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
           <p className="text-xs text-muted-foreground mb-1">Completed</p>
           <p className="text-3xl font-black text-green-700">
             {meetings.filter(m => m.status === 'Completed').length}

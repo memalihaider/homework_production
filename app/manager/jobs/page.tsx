@@ -3,8 +3,26 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ManagerSidebar } from '../_components/sidebar';
-import { getStoredSession, type UserSession } from '@/lib/auth';
 import { Briefcase, Search, Filter, Calendar, MapPin, DollarSign, Users, TrendingUp, Menu, X } from 'lucide-react';
+
+// Temporary function to replace getStoredSession
+const getSessionData = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const session = localStorage.getItem('manager_session');
+    return session ? JSON.parse(session) : null;
+  } catch {
+    return null;
+  }
+};
+
+type UserSession = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  portal: 'manager' | 'guest' | 'employee' | 'supervisor';
+};
 
 const jobs = [
   { id: 'JOB-2024-001', client: 'Al Futtaim Group', title: 'Office Renovation', location: 'Dubai', status: 'In Progress', progress: 65, budget: 150000, spent: 97500, startDate: '2024-01-15', dueDate: '2024-02-15', teamSize: 4, priority: 'high' },
@@ -30,7 +48,7 @@ export default function Jobs() {
   const [selectedJob, setSelectedJob] = useState<typeof jobs[0] | null>(null);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
+    const storedSession = getSessionData();
     if (!storedSession || storedSession.portal !== 'manager') {
       router.push('/login/manager');
       return;

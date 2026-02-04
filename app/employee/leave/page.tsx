@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Menu, X, Calendar, AlertCircle, CheckCircle, Clock } from 'lucide-react';
-import { getStoredSession, type UserSession } from '@/lib/auth';
+import { getSession, type SessionData } from '@/lib/auth';
 import { EmployeeSidebar } from '../_components/sidebar';
 
 interface LeaveRecord {
@@ -31,14 +31,14 @@ const leaveBalance = {
 
 export default function EmployeeLeavePage() {
   const router = useRouter();
-  const [session, setSession] = useState<UserSession | null>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [leaves, setLeaves] = useState<LeaveRecord[]>(mockLeaveData);
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
-    if (!storedSession || storedSession.portal !== 'employee') {
+    const storedSession = getSession();
+    if (!storedSession) {
       router.push('/login/employee');
       return;
     }

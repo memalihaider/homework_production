@@ -20,7 +20,7 @@ import {
   MapPin,
   Clock
 } from 'lucide-react';
-import { getStoredSession, clearSession, type UserSession } from '@/lib/auth';
+import { getSession, clearSession, type SessionData } from '@/lib/auth';
 
 // Mock data for guest dashboard
 const announcements = [
@@ -97,12 +97,12 @@ const sidebarItems = [
 
 export default function GuestDashboard() {
   const router = useRouter();
-  const [session, setSession] = useState<UserSession | null>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
-    if (!storedSession || storedSession.portal !== 'guest') {
+    const storedSession = getSession();
+    if (!storedSession) {
       router.push('/login/guest');
       return;
     }

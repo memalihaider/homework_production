@@ -3,8 +3,26 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ManagerSidebar } from '../_components/sidebar';
-import { getStoredSession, type UserSession } from '@/lib/auth';
 import { BarChart3, TrendingUp, Users, Clock, DollarSign, CheckCircle, Menu, X } from 'lucide-react';
+
+// Temporary function to replace getStoredSession
+const getSessionData = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const session = localStorage.getItem('manager_session');
+    return session ? JSON.parse(session) : null;
+  } catch {
+    return null;
+  }
+};
+
+type UserSession = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  portal: 'manager' | 'guest' | 'employee' | 'supervisor';
+};
 
 const reports = [
   { id: '1', title: 'Team Performance', period: 'January 2024', completionRate: 87, teamProductivity: 92, avgTaskTime: 4.5 },
@@ -20,7 +38,7 @@ export default function Reports() {
   const [selectedReport, setSelectedReport] = useState<typeof reports[0] | null>(null);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
+    const storedSession = getSessionData();
     if (!storedSession || storedSession.portal !== 'manager') {
       router.push('/login/manager');
       return;

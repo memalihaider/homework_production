@@ -3,8 +3,26 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ManagerSidebar } from '../_components/sidebar';
-import { getStoredSession, type UserSession } from '@/lib/auth';
 import { CheckCircle, Clock, AlertCircle, Menu, X, Calendar, DollarSign, User } from 'lucide-react';
+
+// Temporary function to replace getStoredSession
+const getSessionData = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const session = localStorage.getItem('manager_session');
+    return session ? JSON.parse(session) : null;
+  } catch {
+    return null;
+  }
+};
+
+type UserSession = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  portal: 'manager' | 'guest' | 'employee';
+};
 
 const approvals = [
   { id: 'APR-001', type: 'Leave Request', requester: 'Ahmed Hassan', requestDate: '2024-01-28', details: '3 days annual leave', status: 'pending', amount: null },
@@ -28,7 +46,7 @@ export default function Approvals() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
   useEffect(() => {
-    const storedSession = getStoredSession();
+    const storedSession = getSessionData();
     if (!storedSession || storedSession.portal !== 'manager') {
       router.push('/login/manager');
       return;

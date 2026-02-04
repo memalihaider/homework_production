@@ -3,8 +3,26 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ManagerSidebar } from '../_components/sidebar';
-import { getStoredSession, type UserSession } from '@/lib/auth';
 import { Building2, Mail, Phone, MapPin, DollarSign, Briefcase, Menu, X, Star } from 'lucide-react';
+
+// Temporary function to replace getStoredSession
+const getSessionData = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const session = localStorage.getItem('manager_session');
+    return session ? JSON.parse(session) : null;
+  } catch {
+    return null;
+  }
+};
+
+type UserSession = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  portal: 'manager' | 'guest' | 'employee' | 'supervisor';
+};
 
 const clients = [
   { id: '1', name: 'Al Futtaim Group', email: 'contact@alfuttaim.ae', phone: '+971501111111', location: 'Dubai', activeJobs: 1, totalSpent: 97500, rating: 4.8 },
@@ -21,7 +39,7 @@ export default function Clients() {
   const [selectedClient, setSelectedClient] = useState<typeof clients[0] | null>(null);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
+    const storedSession = getSessionData();
     if (!storedSession || storedSession.portal !== 'manager') {
       router.push('/login/manager');
       return;
