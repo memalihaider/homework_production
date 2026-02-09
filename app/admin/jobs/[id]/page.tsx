@@ -2195,7 +2195,7 @@ export default function JobDetailPage() {
           // NEW: Fetch all data from Firebase
           tasks: jobData.tasks || [],
           equipment: jobData.equipment || [],
-          permits: jobData.permits || [],
+          permitss: jobData.permits || [],
           notes: jobData.notes || [],
           reminders: jobData.reminders || [],
           taskAssignments: jobData.taskAssignments || [],
