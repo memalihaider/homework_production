@@ -277,7 +277,7 @@ export default function QuotationReminders() {
       <div className="bg-white border border-gray-300 rounded p-4 shadow-none">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-[12px] uppercase font-bold text-black flex items-center gap-2">
+            <h3 className="text-[12px] uppercase font-bold text-blue-900 flex items-center gap-2">
               <Bell className="w-4 h-4" />
               Send Quotations via Email & WhatsApp
             </h3>
@@ -286,7 +286,7 @@ export default function QuotationReminders() {
           <button 
             onClick={fetchTodayQuotations}
             disabled={loading}
-            className="flex items-center gap-2 px-3 py-1.5 bg-black text-white text-[10px] uppercase font-bold rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-[10px] uppercase font-bold rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {loading ? (
               <RefreshCw className="w-3 h-3 animate-spin" />
@@ -337,19 +337,19 @@ export default function QuotationReminders() {
                   key={q.id} 
                   className={`border rounded p-4 transition-all ${
                     emailSent || whatsappSent ? 'bg-green-50 border-green-200' :
-                    'bg-white border-gray-300 hover:border-black'
+                    'bg-white border-gray-300 hover:border-blue-600'
                   }`}
                 >
                   <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                     {/* Left Section - Quotation Info */}
                     <div className="flex-1">
                       <div className="flex items-start gap-3 mb-4">
-                        <div className="p-2 bg-black rounded">
+                        <div className="p-2 bg-blue-600 rounded">
                           <FileText className="w-5 h-5 text-white" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <p className="text-[15px] font-bold text-black">{q.quoteNumber}</p>
+                            <p className="text-[15px] font-bold text-blue-900">{q.quoteNumber}</p>
                             {(emailSent || whatsappSent) && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-green-100 text-green-700">
                                 <CheckCircle className="w-3 h-3" />
@@ -403,7 +403,7 @@ export default function QuotationReminders() {
                     {/* Right Section - Communication Buttons */}
                     <div className="md:text-right">
                       <div className="mb-4">
-                        <p className="text-2xl font-bold text-black">{formatCurrency(q.total)} {q.currency}</p>
+                        <p className="text-2xl font-bold text-blue-900">{formatCurrency(q.total)} {q.currency}</p>
                         <p className="text-[11px] text-gray-500">Total Amount</p>
                       </div>
                       

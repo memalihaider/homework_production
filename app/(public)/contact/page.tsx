@@ -20,6 +20,7 @@ import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { db } from '@/lib/firebase'
 import { doc, getDoc, collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore'
+import { useContactInfo, formatPhoneDisplay, formatPhoneLink } from '@/lib/hooks/useContactInfo'
 
 interface FirebaseService {
   id: string
@@ -37,11 +38,7 @@ interface FormData {
 
 export default function Contact() {
   const [activeTab, setActiveTab] = useState('form')
-  const [profileData, setProfileData] = useState({
-    email: 'services@homeworkuae.com',
-    phone: '80046639675',
-    whatsapp: '+971 50 717 7059'
-  })
+  const { contactInfo, isLoading } = useContactInfo()
   const [services, setServices] = useState<FirebaseService[]>([])
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -51,31 +48,6 @@ export default function Contact() {
     message: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // Fetch profile data from Firebase
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const docRef = doc(db, 'profile-setting', 'admin-settings')
-        const docSnap = await getDoc(docRef)
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data()
-          if (data.profile) {
-            setProfileData({
-              email: data.profile.email || 'services@homeworkuae.com',
-              phone: data.profile.phone || '80046639675',
-              whatsapp: data.profile.whatsapp || '+971 50 717 7059'
-            })
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching profile data:', error)
-      }
-    }
-
-    fetchProfileData()
-  }, [])
 
   // Fetch active services from Firebase
   useEffect(() => {
@@ -253,24 +225,24 @@ export default function Contact() {
                 <p className="text-slate-400 font-bold mb-10 italic">Talk or Write to us to Discuss your Cleaning Needs</p>
                 
                 <div className="space-y-10">
-                  <a href={`tel:${profileData.phone}`} className="flex gap-6 group cursor-pointer border-b border-white/5 pb-8">
+                  <a href={`tel:${formatPhoneLink(contactInfo.phone)}`} className="flex gap-6 group cursor-pointer border-b border-white/5 pb-8">
                     <div className="h-16 w-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-white transition-all shadow-xl">
                       <Phone className="h-7 w-7" />
                     </div>
                     <div>
                       <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Toll Free Line</div>
-                      <div className="text-xl font-black group-hover:text-primary transition-colors tracking-tighter">{profileData.phone}</div>
+                      <div className="text-xl font-black group-hover:text-primary transition-colors tracking-tighter">{isLoading ? 'Loading...' : formatPhoneDisplay(contactInfo.phone)}</div>
                       <div className="text-slate-400 font-medium text-sm italic">Available 24/7 Support</div>
                     </div>
                   </a>
 
-                  <a href={`mailto:${profileData.email}`} className="flex gap-6 group cursor-pointer border-b border-white/5 pb-8">
+                  <a href={`mailto:${contactInfo.email}`} className="flex gap-6 group cursor-pointer border-b border-white/5 pb-8">
                     <div className="h-16 w-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-white transition-all shadow-xl">
                       <Mail className="h-7 w-7" />
                     </div>
                     <div>
                       <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Email Inquiry</div>
-                      <div className="text-xl font-black group-hover:text-primary transition-colors truncate max-w-[200px] md:max-w-none">{profileData.email}</div>
+                      <div className="text-xl font-black group-hover:text-primary transition-colors truncate max-w-[200px] md:max-w-none">{isLoading ? 'Loading...' : contactInfo.email}</div>
                       <div className="text-slate-400 font-medium text-sm italic">Response within 2 hours</div>
                     </div>
                   </a>
@@ -281,8 +253,7 @@ export default function Contact() {
                     </div>
                     <div>
                       <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Our Location</div>
-                      <div className="text-xl font-black tracking-tight leading-snug">Al Quoz – Dubai</div>
-                      <div className="text-slate-400 font-medium text-sm italic underline decoration-primary/30">United Arab Emirates</div>
+                      <div className="text-xl font-black tracking-tight leading-snug">{isLoading ? 'Loading...' : contactInfo.address}</div>
                     </div>
                   </div>
                 </div>
@@ -317,8 +288,8 @@ export default function Contact() {
                     WhatsApp Chat
                   </h4>
                   <p className="text-green-50/80 mb-6 font-bold italic">Instantly book your cleaning service via WhatsApp.</p>
-                  <a href={`https://wa.me/${profileData.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-emerald-600 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-xl">
-                    {profileData.whatsapp} <ArrowRight className="h-4 w-4" />
+                  <a href={`https://wa.me/${formatPhoneLink(contactInfo.whatsapp || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-emerald-600 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-xl">
+                    {isLoading ? 'Loading...' : contactInfo.whatsapp} <ArrowRight className="h-4 w-4" />
                   </a>
                 </div>
                 <MessageSquare className="absolute -bottom-10 -right-10 h-48 w-48 text-white/10 group-hover:scale-110 transition-transform duration-500" />
@@ -475,7 +446,7 @@ export default function Contact() {
                 </div>
               </div>
               <p className="text-sm font-bold text-slate-600 mb-6 leading-relaxed italic border-l-2 border-primary pl-4">
-                Al Quoz – Dubai – United Arab Emirates
+                {isLoading ? 'Loading location...' : contactInfo.address}
               </p>
               <a 
                 href="https://maps.google.com/?q=Al+Quoz+Dubai" 

@@ -95,15 +95,15 @@ export default function QuotationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-black mb-1">Quotation Management</h1>
+          <h1 className="text-2xl font-bold text-blue-900 mb-1">Quotation Management</h1>
           <p className="text-sm text-gray-500 font-medium">Generate professional quotes, track approvals, and manage client follow-ups</p>
         </div>
         <div className="flex gap-2">
-           <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded text-[11px] font-bold uppercase tracking-tight text-gray-600 hover:bg-gray-50 transition-colors">
+           <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded text-[11px] font-bold uppercase tracking-tight text-gray-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors">
               <Download className="w-4 h-4" />
               Export
            </button>
-           <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded text-[11px] font-bold uppercase tracking-tight text-gray-600 hover:bg-gray-50 transition-colors">
+           <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded text-[11px] font-bold uppercase tracking-tight text-gray-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors">
               <History className="w-4 h-4" />
               Audit Log
            </button>
@@ -123,8 +123,8 @@ export default function QuotationsPage() {
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded transition-colors whitespace-nowrap text-[12px] uppercase font-bold tracking-tight ${
                 activeTab === tab.id
-                  ? 'bg-black text-white'
-                  : 'text-gray-500 hover:bg-gray-100 border border-transparent'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-500 hover:bg-blue-50 border border-transparent'
               }`}
             >
               <TabIcon className="w-4 h-4" />

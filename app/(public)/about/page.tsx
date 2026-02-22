@@ -3,9 +3,11 @@
 import { CheckCircle2, Users, Award, Leaf, Target, Eye, Heart, Sparkles, ShieldCheck, Zap, ArrowRight, History, Building2 } from 'lucide-react'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { useRef } from 'react'
+import { useContactInfo, formatPhoneDisplay, formatPhoneLink } from '@/lib/hooks/useContactInfo'
 
 export default function About() {
   const ref = useRef(null)
+  const { contactInfo, isLoading } = useContactInfo()
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start start", "end start"]
@@ -209,27 +211,27 @@ export default function About() {
                   </div>
                   <div>
                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Main Office</div>
-                    <div className="text-lg font-bold">Al Quoz - Dubai - United Arab Emirates</div>
+                    <div className="text-lg font-bold">{isLoading ? 'Loading...' : contactInfo.address}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-6 group">
+                <a href={`tel:${formatPhoneLink(contactInfo.phone)}`} className="flex items-center gap-6 group cursor-pointer hover:opacity-80 transition-opacity">
                   <div className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
                     <Zap className="h-6 w-6" />
                   </div>
                   <div>
                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Toll Free</div>
-                    <div className="text-lg font-bold">800 4663 9675</div>
+                    <div className="text-lg font-bold">{isLoading ? 'Loading...' : formatPhoneDisplay(contactInfo.phone)}</div>
                   </div>
-                </div>
-                <div className="flex items-center gap-6 group">
+                </a>
+                <a href={`mailto:${contactInfo.email}`} className="flex items-center gap-6 group cursor-pointer hover:opacity-80 transition-opacity">
                   <div className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
                     <Heart className="h-6 w-6" />
                   </div>
                   <div>
                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Email Support</div>
-                    <div className="text-lg font-bold">services@homeworkuae.com</div>
+                    <div className="text-lg font-bold">{isLoading ? 'Loading...' : contactInfo.email}</div>
                   </div>
-                </div>
+                </a>
               </div>
               
               <motion.a 

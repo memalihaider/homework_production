@@ -753,10 +753,10 @@ import { useState, useMemo, useEffect } from 'react'
 import { 
   Plus, Trash2, Save, Eye, Percent, DollarSign, 
   User, Building2, MapPin, Mail, Phone, ShoppingCart, 
-  Settings, FileText, ChevronDown, Check, X
+  Settings, FileText, ChevronDown, Check, X, Download
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
-import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, getDocs, query, where, getDoc, doc } from 'firebase/firestore'
 
 interface Client {
   id: string;
@@ -825,6 +825,15 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
   const [services, setServices] = useState<Service[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [showCustomClient, setShowCustomClient] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [brandingSettings, setBrandingSettings] = useState<any>({
+    companyName: '',
+    logo: '',
+    contactEmail: '',
+    contactPhone: '',
+    contactAddress: '',
+    website: ''
+  })
   const [customClient, setCustomClient] = useState({
     name: '',
     company: '',
@@ -869,6 +878,12 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
         ...doc.data()
       })) as Service[]
       setServices(servicesData)
+
+      // Fetch branding settings from 'settings' collection
+      const settingsDoc = await getDoc(doc(db, 'settings', 'branding'))
+      if (settingsDoc.exists()) {
+        setBrandingSettings(settingsDoc.data())
+      }
 
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -1129,6 +1144,218 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
     }
   }
 
+  const handleDownloadPDF = async () => {
+    try {
+      if (!formData.client) {
+        alert('Please select a client before downloading')
+        return
+      }
+
+      const { jsPDF } = await import('jspdf')
+      
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+      })
+
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      let yPosition = 15
+
+      // Company Logo and Branding Header
+      if (brandingSettings?.logo) {
+        try {
+          const logoImage = brandingSettings.logo
+          pdf.addImage(logoImage, 'PNG', 20, yPosition, 25, 20)
+          yPosition += 22
+        } catch (e) {
+          console.warn('Could not add logo:', e)
+          yPosition += 5
+        }
+      } else {
+        yPosition += 8
+      }
+
+      // Company Name and Contact Info
+      if (brandingSettings?.companyName) {
+        pdf.setFontSize(18)
+        pdf.setTextColor(30, 58, 138) // Blue-900
+        pdf.text(brandingSettings.companyName, 20, yPosition)
+        yPosition += 8
+      }
+
+      // Contact Information
+      if (brandingSettings?.contactEmail || brandingSettings?.contactPhone || brandingSettings?.contactAddress || brandingSettings?.website) {
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 100, 100)
+        const contactItems = []
+        if (brandingSettings?.contactEmail) contactItems.push(`Email: ${brandingSettings.contactEmail}`)
+        if (brandingSettings?.contactPhone) contactItems.push(`Phone: ${brandingSettings.contactPhone}`)
+        if (brandingSettings?.contactAddress) contactItems.push(`Address: ${brandingSettings.contactAddress}`)
+        if (brandingSettings?.website) contactItems.push(`Website: ${brandingSettings.website}`)
+        
+        contactItems.forEach(item => {
+          pdf.text(item, 20, yPosition)
+          yPosition += 3
+        })
+        yPosition += 3
+      }
+
+      // Border line
+      pdf.setDrawColor(37, 99, 235) // Blue-600
+      pdf.setLineWidth(1.5)
+      pdf.line(20, yPosition, pageWidth - 20, yPosition)
+      yPosition += 8
+
+      // Title
+      pdf.setFontSize(32)
+      pdf.setTextColor(30, 58, 138) // Blue-900
+      pdf.text('QUOTATION', 20, yPosition)
+      yPosition += 12
+
+      // Quote details header - 4 column grid
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100)
+      
+      const colWidth = (pageWidth - 40) / 4
+      const details = [
+        { label: 'Quote #', value: formData.quoteNumber },
+        { label: 'Date', value: new Date(formData.date).toLocaleDateString() },
+        { label: 'Valid Until', value: new Date(formData.validUntil).toLocaleDateString() },
+        { label: 'Currency', value: formData.currency }
+      ]
+      
+      details.forEach((detail, idx) => {
+        const x = 20 + (idx * colWidth)
+        pdf.text(detail.label, x, yPosition, { maxWidth: colWidth - 2 })
+        pdf.setTextColor(30, 58, 138)
+        pdf.setFontSize(10)
+        pdf.text(detail.value, x, yPosition + 5, { maxWidth: colWidth - 2 })
+        pdf.setTextColor(100, 100, 100)
+        pdf.setFontSize(8)
+      })
+      yPosition += 15
+
+      // Separator line
+      pdf.setDrawColor(220, 220, 220)
+      pdf.setLineWidth(0.5)
+      pdf.line(20, yPosition, pageWidth - 20, yPosition)
+      yPosition += 8
+
+      // Bill To section
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100)
+      pdf.text('BILL TO', 20, yPosition)
+      yPosition += 4
+      
+      pdf.setFontSize(10)
+      pdf.setTextColor(30, 58, 138)
+      pdf.text(formData.client, 20, yPosition)
+      yPosition += 5
+
+      pdf.setFontSize(8)
+      pdf.setTextColor(80, 80, 80)
+      if (formData.company) {
+        pdf.text(`${formData.company}`, 20, yPosition)
+        yPosition += 3
+      }
+      if (formData.email) {
+        pdf.text(`${formData.email}`, 20, yPosition)
+        yPosition += 3
+      }
+      if (formData.phone) {
+        pdf.text(`${formData.phone}`, 20, yPosition)
+        yPosition += 3
+      }
+      if (formData.location) {
+        pdf.text(`Location: ${formData.location}`, 20, yPosition)
+        yPosition += 4
+      }
+
+      yPosition += 5
+
+      // Services/Products table
+      if (formData.services?.length > 0 || formData.products?.length > 0) {
+        // Table header
+        pdf.setFillColor(239, 246, 255) // Blue-50
+        pdf.rect(20, yPosition, pageWidth - 40, 6, 'F')
+        
+        pdf.setFontSize(9)
+        pdf.setTextColor(30, 58, 138)
+        pdf.text('Description', 22, yPosition + 4)
+        pdf.text('Qty', 130, yPosition + 4)
+        pdf.text('Unit Price', 150, yPosition + 4)
+        pdf.text('Total', pageWidth - 25, yPosition + 4, { align: 'right' })
+        
+        yPosition += 8
+
+        // Table rows
+        pdf.setFontSize(9)
+        pdf.setTextColor(51, 51, 51)
+
+        const items = [...(formData.services || []), ...(formData.products || [])]
+        items.forEach((item: any) => {
+          if (yPosition > 250) {
+            pdf.addPage()
+            yPosition = 20
+          }
+
+          const description = `${item.name}${item.description ? ` - ${item.description}` : ''}`
+          pdf.text(description, 22, yPosition)
+          pdf.text(String(item.quantity), 130, yPosition)
+          pdf.text(`${item.unitPrice?.toLocaleString()}`, 150, yPosition)
+          pdf.text(`${item.total?.toLocaleString()}`, pageWidth - 25, yPosition, { align: 'right' })
+          
+          yPosition += 5
+        })
+
+        yPosition += 5
+      }
+
+      // Summary section
+      yPosition += 5
+      const summaryX = pageWidth - 70
+      
+      pdf.setFontSize(9)
+      pdf.setTextColor(51, 51, 51)
+      pdf.text('Subtotal:', summaryX, yPosition)
+      pdf.text(`${calculations.subtotal?.toLocaleString()} ${formData.currency}`, pageWidth - 20, yPosition, { align: 'right' })
+      yPosition += 5
+
+      if (calculations.discountAmount > 0) {
+        pdf.setTextColor(34, 197, 94) // Green
+        pdf.text(`Discount (-${formData.discount}${formData.discountType === 'percentage' ? '%' : ''})`, summaryX, yPosition)
+        pdf.text(`${calculations.discountAmount?.toLocaleString()} ${formData.currency}`, pageWidth - 20, yPosition, { align: 'right' })
+        yPosition += 5
+      }
+
+      pdf.setTextColor(51, 51, 51)
+      pdf.text(`Tax (${formData.taxRate}%):`, summaryX, yPosition)
+      pdf.text(`${calculations.taxAmount?.toLocaleString()} ${formData.currency}`, pageWidth - 20, yPosition, { align: 'right' })
+      yPosition += 6
+
+      // Total line
+      pdf.setDrawColor(100, 100, 100)
+      pdf.setLineWidth(0.5)
+      pdf.line(summaryX, yPosition, pageWidth - 20, yPosition)
+      yPosition += 5
+
+      pdf.setFontSize(12)
+      pdf.setTextColor(30, 58, 138)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('TOTAL:', summaryX, yPosition)
+      pdf.text(`${calculations.total?.toLocaleString()} ${formData.currency}`, pageWidth - 20, yPosition, { align: 'right' })
+
+      // Save PDF
+      pdf.save(`${formData.quoteNumber}.pdf`)
+      alert('✅ PDF downloaded successfully!')
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('❌ Error generating PDF. Please check console and try again.')
+    }
+  }
+
   const handleAddCustomClient = () => {
     if (!customClient.name.trim()) {
       alert('Please enter client name')
@@ -1177,7 +1404,7 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
         {/* Header Section */}
         <div className="bg-white border border-gray-300 rounded p-4 space-y-4 shadow-none">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
-             <h3 className="text-sm font-bold uppercase tracking-tight text-black flex items-center gap-2">
+             <h3 className="text-sm font-bold uppercase tracking-tight text-blue-900 flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 Quotation Information
              </h3>
@@ -1424,13 +1651,13 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
         {/* Services Section */}
         <div className="bg-white border border-gray-300 rounded p-4 space-y-4 shadow-none">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-2">
-            <h3 className="text-sm font-bold uppercase tracking-tight text-black flex items-center gap-2">
+            <h3 className="text-sm font-bold uppercase tracking-tight text-blue-900 flex items-center gap-2">
               <Settings className="w-4 h-4" />
               Service Line Items
             </h3>
             <button 
               onClick={handleAddService}
-              className="px-3 py-1 bg-black text-white text-[10px] uppercase font-bold rounded hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1 bg-blue-600 text-white text-[10px] uppercase font-bold rounded hover:bg-blue-700 transition-colors flex items-center gap-1.5"
             >
               <Plus className="w-3 h-3" />
               Add Service
@@ -1552,11 +1779,11 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
       {/* RIGHT: SUMMARY & ACTIONS */}
       <div className="w-full lg:w-[320px] space-y-4">
         {/* TOTALS BOX */}
-        <div className="bg-black text-white rounded p-1 shadow-none">
-          <div className="bg-white border border-black rounded p-4 space-y-4">
+        <div className="bg-blue-600 text-white rounded p-1 shadow-none">
+          <div className="bg-white border border-blue-600 rounded p-4 space-y-4">
             <div className="flex justify-between items-center border-b border-gray-50 pb-3">
                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Pricing Summary</span>
-               <span className="text-[10px] font-medium text-black bg-gray-100 px-2 py-0.5 rounded uppercase">AED</span>
+               <span className="text-[10px] font-medium text-blue-900 bg-gray-100 px-2 py-0.5 rounded uppercase">AED</span>
             </div>
 
             <div className="space-y-2.5">
@@ -1571,7 +1798,7 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
                     <div className="flex gap-1">
                       <input 
                         type="number"
-                        className="w-full text-[13px] text-black font-black border border-gray-200 rounded px-2 py-1 focus:border-black focus:ring-0"
+                        className="w-full text-[13px] text-blue-900 font-black border border-gray-200 rounded px-2 py-1 focus:border-blue-600 focus:ring-0"
                         value={formData.discount}
                         onChange={(e) => setFormData({ ...formData, discount: Number(e.target.value) || 0 })}
                         min="0"
@@ -1588,7 +1815,7 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
                     <label className="text-[9px] uppercase font-black text-gray-400">Tax (%)</label>
                     <input 
                         type="number"
-                        className="w-full text-[13px] text-black font-black border border-gray-200 rounded px-2 py-1 focus:border-black focus:ring-0"
+                        className="w-full text-[13px] text-blue-900 font-black border border-gray-200 rounded px-2 py-1 focus:border-blue-600 focus:ring-0"
                         value={formData.taxRate}
                         onChange={(e) => setFormData({ ...formData, taxRate: Number(e.target.value) || 0 })}
                         min="0"
@@ -1610,11 +1837,11 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
                   </div>
                </div>
 
-               <div className="pt-4 border-t-2 border-black">
+               <div className="pt-4 border-t-2 border-blue-600">
                   <div className="flex justify-between items-end">
                      <div>
-                        <p className="text-[9px] uppercase font-black text-black leading-none mb-1">Total Payable</p>
-                        <p className="text-2xl font-black text-black leading-none tracking-tighter">
+                        <p className="text-[9px] uppercase font-black text-blue-900 leading-none mb-1">Total Payable</p>
+                        <p className="text-2xl font-black text-blue-900 leading-none tracking-tighter">
                           {calculations.total.toLocaleString()}
                         </p>
                      </div>
@@ -1633,7 +1860,7 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
             className={`w-full flex items-center justify-center gap-2 py-3 rounded text-sm font-bold uppercase tracking-widest transition-all shadow-lg text-center ${
               loading || loadingData
                 ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-black text-white hover:bg-gray-800 shadow-black/10'
+                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-900/10'
             }`}
            >
               {loading ? (
@@ -1654,13 +1881,22 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
               )}
            </button>
            
-           <div className="grid grid-cols-2 gap-2">
+           <div className="grid grid-cols-3 gap-2">
               <button 
-                disabled={loadingData}
-                className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-600 py-2 rounded text-[11px] font-bold uppercase tracking-tight hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setShowPreview(true)}
+                disabled={loadingData || !formData.client}
+                className="flex-1 flex items-center justify-center gap-2 border border-blue-300 text-blue-600 py-2 rounded text-[11px] font-bold uppercase tracking-tight hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                  <Eye className="w-3.5 h-3.5" />
                  Preview
+              </button>
+              <button 
+                onClick={handleDownloadPDF}
+                disabled={loadingData || !formData.client}
+                className="flex-1 flex items-center justify-center gap-2 border border-green-300 text-green-600 py-2 rounded text-[11px] font-bold uppercase tracking-tight hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                 <Download className="w-3.5 h-3.5" />
+                 Download
               </button>
               <button 
                 onClick={onCancel}
@@ -1688,6 +1924,221 @@ export default function QuotationBuilder({ initialData, onSave, onCancel }: Prop
            )}
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header with Actions */}
+            <div className="sticky top-0 bg-linear-to-r from-white to-blue-50 border-b border-gray-300 px-6 py-4 flex items-center justify-between shadow-sm">
+              <div>
+                <h2 className="text-xl font-bold text-blue-900">Quotation Preview</h2>
+                <p className="text-xs text-gray-500 mt-1">{formData.quoteNumber}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDownloadPDF}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-bold"
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </button>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none w-8 h-8 flex items-center justify-center"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body - Quotation Preview */}
+            <div id="quotation-preview-content" className="p-12 bg-white">
+              {/* Logo and Company Header - Professional Layout */}
+              <div className="mb-12 pb-8 border-b-2 border-blue-600 flex items-start gap-8">
+                {brandingSettings?.logo && (
+                  <div className="shrink-0 pt-1">
+                    <img 
+                      src={brandingSettings.logo} 
+                      alt="Company Logo" 
+                      className="h-14 object-contain"
+                    />
+                  </div>
+                )}
+                <div className="flex-1">
+                  {brandingSettings?.companyName && (
+                    <h2 className="text-4xl font-black text-blue-900 mb-4">{brandingSettings.companyName}</h2>
+                  )}
+                  {(brandingSettings?.contactEmail || brandingSettings?.contactPhone || brandingSettings?.contactAddress || brandingSettings?.website) && (
+                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
+                      {brandingSettings?.contactEmail && (
+                        <div className="flex items-center gap-2.5">
+                          <Mail className="h-4 w-4 text-blue-600 shrink-0" />
+                          <span className="leading-tight">{brandingSettings.contactEmail}</span>
+                        </div>
+                      )}
+                      {brandingSettings?.contactPhone && (
+                        <div className="flex items-center gap-2.5">
+                          <Phone className="h-4 w-4 text-blue-600 shrink-0" />
+                          <span className="leading-tight">{brandingSettings.contactPhone}</span>
+                        </div>
+                      )}
+                      {brandingSettings?.contactAddress && (
+                        <div className="flex items-start gap-2.5">
+                          <MapPin className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0\" />
+                          <span className="leading-tight">{brandingSettings.contactAddress}</span>
+                        </div>
+                      )}
+                      {brandingSettings?.website && (
+                        <div className="flex items-center gap-2.5">
+                          <Building2 className="h-4 w-4 text-blue-600 shrink-0" />
+                          <span className="leading-tight">{brandingSettings.website}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quotation Title and Key Details */}
+              <h1 className="text-5xl font-black text-blue-900 mb-8 tracking-tight">QUOTATION</h1>
+              <div className="grid grid-cols-4 gap-6 mb-12 pb-8 border-b-2 border-gray-200">
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Quote #</p>
+                  <p className="text-lg font-bold text-blue-900">{formData.quoteNumber}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Date</p>
+                  <p className="text-lg font-bold text-blue-900">{new Date(formData.date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Valid Until</p>
+                  <p className="text-lg font-bold text-blue-900">{new Date(formData.validUntil).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Currency</p>
+                  <p className="text-lg font-bold text-blue-900">{formData.currency}</p>
+                </div>
+              </div>
+
+              {/* Client Information - Better Alignment */}
+              <div className="grid grid-cols-2 gap-12 mb-10">
+                <div>
+                  <p className="text-xs font-bold text-gray-600 uppercase mb-3 tracking-wide">Bill To</p>
+                  <div className="space-y-1.5">
+                    <p className="text-lg font-bold text-blue-900">{formData.client}</p>
+                    {formData.company && <p className="text-sm text-gray-700 font-medium">{formData.company}</p>}
+                    {formData.email && <p className="text-sm text-gray-600">{formData.email}</p>}
+                    {formData.phone && <p className="text-sm text-gray-600">{formData.phone}</p>}
+                    {formData.location && <p className="text-sm text-gray-600">{formData.location}</p>}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-600 uppercase mb-3 tracking-wide">Quotation Details</p>
+                  <div className="space-y-1.5 text-sm">
+                    <p><span className="font-bold text-gray-700">Tax Rate:</span> <span className="text-gray-600">{formData.taxRate}%</span></p>
+                    {formData.discount > 0 && (
+                      <p><span className="font-bold text-gray-700">Discount:</span> <span className="text-green-600 font-medium">{formData.discount} {formData.discountType === 'percentage' ? '%' : formData.currency}</span></p>
+                    )}
+                    <p><span className="font-bold text-gray-700">Status:</span> <span className="text-blue-600 font-medium">{formData.status}</span></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Services & Products Table */}
+              {(formData.services?.length > 0 || formData.products?.length > 0) && (
+                <div className="mb-8">
+                  <table className="w-full border-collapse mb-4">
+                    <thead>
+                      <tr className="bg-blue-50 border-b-2 border-blue-600">
+                        <th className="text-left px-3 py-2 text-xs font-bold text-blue-900 uppercase">Item Description</th>
+                        <th className="text-center px-3 py-2 text-xs font-bold text-blue-900 uppercase">Qty</th>
+                        <th className="text-right px-3 py-2 text-xs font-bold text-blue-900 uppercase">Unit Price</th>
+                        <th className="text-right px-3 py-2 text-xs font-bold text-blue-900 uppercase">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {formData.services?.map((service: any, idx: number) => (
+                        <tr key={`service-${idx}`}>
+                          <td className="px-3 py-3 text-sm text-gray-700">
+                            <p className="font-bold">{service.name}</p>
+                            {service.description && <p className="text-xs text-gray-500 mt-1">{service.description}</p>}
+                          </td>
+                          <td className="text-center px-3 py-3 text-sm text-gray-700">{service.quantity}</td>
+                          <td className="text-right px-3 py-3 text-sm text-gray-700">{service.unitPrice?.toLocaleString()} {formData.currency}</td>
+                          <td className="text-right px-3 py-3 text-sm font-bold text-blue-900">{service.total?.toLocaleString()} {formData.currency}</td>
+                        </tr>
+                      ))}
+                      {formData.products?.map((product: any, idx: number) => (
+                        <tr key={`product-${idx}`}>
+                          <td className="px-3 py-3 text-sm text-gray-700">
+                            <p className="font-bold">{product.name}</p>
+                            {product.sku && <p className="text-xs text-gray-500 mt-1">SKU: {product.sku}</p>}
+                          </td>
+                          <td className="text-center px-3 py-3 text-sm text-gray-700">{product.quantity}</td>
+                          <td className="text-right px-3 py-3 text-sm text-gray-700">{product.unitPrice?.toLocaleString()} {formData.currency}</td>
+                          <td className="text-right px-3 py-3 text-sm font-bold text-blue-900">{product.total?.toLocaleString()} {formData.currency}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="grid grid-cols-2 gap-8 mb-8">
+                <div>
+                  {formData.notes && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-500 uppercase mb-2">Notes</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{formData.notes}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <p className="text-sm font-bold text-gray-600">Subtotal:</p>
+                      <p className="text-sm font-bold text-gray-900">{calculations.subtotal?.toLocaleString()} {formData.currency}</p>
+                    </div>
+                    {calculations.discountAmount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <p className="text-sm font-bold">Discount:</p>
+                        <p className="text-sm font-bold">-{calculations.discountAmount?.toLocaleString()} {formData.currency}</p>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <p className="text-sm font-bold text-gray-600">Tax ({formData.taxRate}%):</p>
+                      <p className="text-sm font-bold text-gray-900">+{calculations.taxAmount?.toLocaleString()} {formData.currency}</p>
+                    </div>
+                    <div className="flex justify-between border-t-2 border-blue-600 pt-2 mt-2">
+                      <p className="text-base font-black text-blue-900">Total:</p>
+                      <p className="text-base font-black text-blue-900">{calculations.total?.toLocaleString()} {formData.currency}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {formData.terms && (
+                <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-8">
+                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Terms & Conditions</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{formData.terms}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 p-4 bg-gray-50 flex gap-3 justify-end">
+              <button
+                onClick={() => setShowPreview(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded hover:bg-gray-100 transition-colors text-sm uppercase"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

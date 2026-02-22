@@ -171,13 +171,13 @@ export default function QuotationDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-black">Quotation Dashboard</h2>
+          <h2 className="text-lg font-bold text-blue-900">Quotation Dashboard</h2>
           <p className="text-sm text-gray-500">Real-time analytics from Firebase</p>
         </div>
         <button 
           onClick={fetchQuotations}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-bold rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {loading ? (
             <>

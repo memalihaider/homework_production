@@ -15,7 +15,9 @@ import {
   Sun,
   Monitor,
   MapPin,
-  MessageCircle
+  MessageCircle,
+  Building2,
+  Upload
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
@@ -67,6 +69,18 @@ export default function Settings() {
     timezone: 'UAE (GMT+4)',
     dateFormat: 'DD/MM/YYYY'
   })
+
+  // Branding Settings
+  const [brandingSettings, setBrandingSettings] = useState({
+    companyName: '',
+    logo: '', // Base64 logo
+    contactEmail: '',
+    contactPhone: '',
+    contactAddress: '',
+    website: ''
+  })
+
+  const [logoPreview, setLogoPreview] = useState('')
 
   // Fetch settings from Firebase on component mount
   useEffect(() => {
@@ -130,17 +144,44 @@ export default function Settings() {
               dateFormat: data.general.dateFormat || 'DD/MM/YYYY'
             })
           }
+
         }
       } catch (error) {
         console.error('Error fetching settings:', error)
       }
     }
     
+    // Fetch branding settings from 'settings' collection
+    const fetchBrandingSettings = async () => {
+      try {
+        const brandingRef = doc(db, 'settings', 'branding')
+        const brandingSnap = await getDoc(brandingRef)
+        if (brandingSnap.exists()) {
+          const data = brandingSnap.data()
+          setBrandingSettings({
+            companyName: data.companyName || '',
+            logo: data.logo || '',
+            contactEmail: data.contactEmail || '',
+            contactPhone: data.contactPhone || '',
+            contactAddress: data.contactAddress || '',
+            website: data.website || ''
+          })
+          if (data.logo) {
+            setLogoPreview(data.logo)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching branding settings:', error)
+      }
+    }
+    
     fetchSettings()
+    fetchBrandingSettings()
   }, [])
 
   const sections = [
     { id: 'profile', label: 'Profile Settings', icon: User },
+    { id: 'branding', label: 'Branding', icon: Building2 },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'billing', label: 'Billing & Plans', icon: CreditCard },
@@ -160,7 +201,12 @@ export default function Settings() {
         lastUpdated: new Date()
       }
       
+      // Save profile and other settings to 'profile-setting' collection
       await setDoc(doc(db, 'profile-setting', 'admin-settings'), settingsData)
+      
+      // Save branding settings to 'settings' collection
+      await setDoc(doc(db, 'settings', 'branding'), brandingSettings)
+      
       alert('Settings saved successfully!')
       setShowSave(false)
     } catch (error) {
@@ -197,6 +243,25 @@ export default function Settings() {
   const handleGeneralChange = (field: string, value: string) => {
     setGeneralSettings({ ...generalSettings, [field]: value })
     setShowSave(true)
+  }
+
+  const handleBrandingChange = (field: string, value: string) => {
+    setBrandingSettings({ ...brandingSettings, [field]: value })
+    setShowSave(true)
+  }
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const base64String = reader.result as string
+        setBrandingSettings({ ...brandingSettings, logo: base64String })
+        setLogoPreview(base64String)
+        setShowSave(true)
+      }
+      reader.readAsDataURL(file)
+    }
   }
 
   return (
@@ -318,7 +383,7 @@ export default function Settings() {
                   <textarea
                     value={profileData.address}
                     onChange={(e) => handleProfileChange('address', e.target.value)}
-                    className="w-full px-4 py-2 bg-muted border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 min-h-[100px]"
+                    className="w-full px-4 py-2 bg-muted border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 min-h-25"
                     placeholder="Enter company address (e.g., Business Bay, Dubai, UAE)"
                     rows={3}
                   />
@@ -576,6 +641,119 @@ export default function Settings() {
                     <option>MM/DD/YYYY</option>
                     <option>YYYY-MM-DD</option>
                   </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Branding Settings */}
+          {activeSection === 'branding' && (
+            <div className="bg-card rounded-xl border shadow-sm p-6 space-y-6">
+              <h2 className="text-xl font-bold mb-6">Branding Settings</h2>
+
+              <div className="space-y-6">
+                {/* Company Name */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Company Name</label>
+                  <input
+                    type="text"
+                    value={brandingSettings.companyName}
+                    onChange={(e) => handleBrandingChange('companyName', e.target.value)}
+                    className="w-full px-4 py-2 bg-muted border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    placeholder="Enter your company name"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Used in quotations and documents</p>
+                </div>
+
+                {/* Logo Upload */}
+                <div>
+                  <label className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <Upload className="h-4 w-4" />
+                    Company Logo
+                  </label>
+                  <div className="space-y-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="w-full px-4 py-2 bg-muted border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">Supported formats: JPG, PNG, GIF (Max 2MB). Recommended size: 300x100px</p>
+                    
+                    {logoPreview && (
+                      <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <p className="text-xs font-bold text-gray-600 mb-2">Logo Preview:</p>
+                        <img 
+                          src={logoPreview} 
+                          alt="Logo preview" 
+                          className="h-20 object-contain"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div className="border-t pt-6">
+                  <h3 className="text-sm font-bold mb-4">Contact Information</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Contact Email
+                      </label>
+                      <input
+                        type="email"
+                        value={brandingSettings.contactEmail}
+                        onChange={(e) => handleBrandingChange('contactEmail', e.target.value)}
+                        className="w-full px-4 py-2 bg-muted border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                        placeholder="contact@company.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <Smartphone className="h-4 w-4" />
+                        Contact Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={brandingSettings.contactPhone}
+                        onChange={(e) => handleBrandingChange('contactPhone', e.target.value)}
+                        className="w-full px-4 py-2 bg-muted border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                        placeholder="+971 50 123 4567"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Contact Address
+                      </label>
+                      <textarea
+                        value={brandingSettings.contactAddress}
+                        onChange={(e) => handleBrandingChange('contactAddress', e.target.value)}
+                        className="w-full px-4 py-2 bg-muted border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 resize-none"
+                        placeholder="Dubai Marina, UAE"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        Website
+                      </label>
+                      <input
+                        type="url"
+                        value={brandingSettings.website}
+                        onChange={(e) => handleBrandingChange('website', e.target.value)}
+                        className="w-full px-4 py-2 bg-muted border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                        placeholder="https://www.company.com"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

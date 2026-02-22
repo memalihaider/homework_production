@@ -11,44 +11,10 @@ import {
 import { db } from '@/lib/firebase'
 import { doc, getDoc } from 'firebase/firestore'
 import Link from 'next/link'
+import { useContactInfo, formatPhoneDisplay, formatPhoneLink } from '@/lib/hooks/useContactInfo'
 
 export default function PublicLayout({ children }: { children: ReactNode }) {
-  const [profileData, setProfileData] = useState({
-    phone: '80046639675',
-    email: 'services@homeworkuae.com',
-    company: 'homeware',
-    address: 'Office: 201, 2nd Floor, Al Saaha Offices - B, Downtown Dubai - UAE' // Default address
-  })
-  const [isLoading, setIsLoading] = useState(true)
-
-  // Fetch profile data from Firebase
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const docRef = doc(db, 'profile-setting', 'admin-settings')
-        const docSnap = await getDoc(docRef)
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data()
-          if (data.profile) {
-            setProfileData({
-              phone: data.profile.phone || '80046639675',
-              email: data.profile.email || 'services@homeworkuae.com',
-              company: data.profile.company || 'homeware',
-              address: data.profile.address || 'Office: 201, 2nd Floor, Al Saaha Offices - B, Downtown Dubai - UAE' // Fetch address from Firebase
-            })
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching profile data:', error)
-        // Keep default values if Firebase fails
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchProfileData()
-  }, [])
+  const { contactInfo, isLoading } = useContactInfo()
 
   return (
     <div className="min-h-screen bg-white text-slate-900 transition-colors duration-300">
@@ -57,22 +23,22 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
         <div className="container mx-auto px-4 flex justify-between items-center text-xs font-bold">
           <div className="flex items-center gap-8">
             <a 
-              href={`tel:${profileData.phone}`} 
+              href={`tel:${formatPhoneLink(contactInfo.phone)}`} 
               className="flex items-center gap-2 hover:text-white/90 transition-all group"
             >
               <div className="h-7 w-7 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-all">
                 <Phone className="h-3.5 w-3.5" />
               </div>
-              <span className="tracking-wider">{profileData.phone}</span>
+              <span className="tracking-wider">{isLoading ? 'Loading...' : formatPhoneDisplay(contactInfo.phone)}</span>
             </a>
             <a 
-              href={`mailto:${profileData.email}`} 
+              href={`mailto:${contactInfo.email}`} 
               className="flex items-center gap-2 hover:text-white/90 transition-all group"
             >
               <div className="h-7 w-7 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-all">
                 <Mail className="h-3.5 w-3.5" />
               </div>
-              <span className="tracking-wide">{profileData.email}</span>
+              <span className="tracking-wide">{isLoading ? 'Loading...' : contactInfo.email}</span>
             </a>
           </div>
           <div className="flex items-center gap-3">
@@ -293,32 +259,38 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                     {isLoading ? (
                       <span className="animate-pulse bg-slate-800 rounded w-48 h-4 block"></span>
                     ) : (
-                      profileData.address
+                      contactInfo.address
                     )}
                   </span>
                 </li>
-                <li className="flex items-start gap-4 group cursor-pointer">
-                   <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0 shadow-lg">
-                    <Phone className="h-4 w-4" />
+                <li className=\"flex items-start gap-4 group cursor-pointer\">
+                   <div className=\"h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0 shadow-lg\">
+                    <Phone className=\"h-4 w-4\" />
                   </div>
-                  <a href={`tel:${profileData.phone}`} className="group-hover:text-white transition-colors">
-                    {isLoading ? (
-                      <span className="animate-pulse bg-slate-800 rounded w-32 h-4 block"></span>
-                    ) : (
-                      profileData.phone
-                    )}
+                  <a href={`tel:${formatPhoneLink(contactInfo.phone)}`} className=\"group-hover:text-white transition-colors\">
+                    <div className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest\">Phone</div>
+                    <div className=\"font-bold\">
+                      {isLoading ? (
+                        <span className=\"animate-pulse bg-slate-800 rounded w-32 h-4 block\"></span>
+                      ) : (
+                        formatPhoneDisplay(contactInfo.phone)
+                      )}
+                    </div>
                   </a>
                 </li>
-                <li className="flex items-start gap-4 group cursor-pointer">
-                   <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0 shadow-lg">
-                    <Mail className="h-4 w-4" />
+                <li className=\"flex items-start gap-4 group cursor-pointer\">
+                   <div className=\"h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0 shadow-lg\">
+                    <Mail className=\"h-4 w-4\" />
                   </div>
-                  <a href={`mailto:${profileData.email}`} className="group-hover:text-white transition-colors">
-                    {isLoading ? (
-                      <span className="animate-pulse bg-slate-800 rounded w-40 h-4 block"></span>
-                    ) : (
-                      profileData.email
-                    )}
+                  <a href={`mailto:${contactInfo.email}`} className=\"group-hover:text-white transition-colors\">
+                    <div className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest\">Email</div>
+                    <div className=\"font-bold\">
+                      {isLoading ? (
+                        <span className=\"animate-pulse bg-slate-800 rounded w-40 h-4 block\"></span>
+                      ) : (
+                        contactInfo.email
+                      )}
+                    </div>
                   </a>
                 </li>
               </ul>
@@ -411,7 +383,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
         
         {/* Phone Button - Secondary */}
         <a 
-          href={`tel:${profileData.phone}`} 
+          href={`tel:${formatPhoneLink(contactInfo.phone)}`} 
           className="pointer-events-auto group relative"
         >
           {/* Main button */}
@@ -421,13 +393,13 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
           
           {/* Tooltip */}
           <div className="absolute -left-44 bottom-0 px-4 py-3 bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.15em] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-2xl border border-white/10 md:block hidden">
-            📞 Call: {profileData.phone}
+            📞 Call: {isLoading ? 'Loading...' : formatPhoneDisplay(contactInfo.phone)}
           </div>
         </a>
 
         {/* Email Button - Tertiary */}
         <a 
-          href={`mailto:${profileData.email}`} 
+          href={`mailto:${contactInfo.email}`} 
           className="pointer-events-auto group relative"
         >
           {/* Main button */}

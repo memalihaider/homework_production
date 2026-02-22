@@ -120,6 +120,233 @@ export default function QuotationList({ onEdit, onView, onSend, refreshTrigger }
     }
   }
 
+  // Download quotation as PDF
+  const handleDownloadQuotation = async (quotation: FirebaseQuotation) => {
+    try {
+      const { jsPDF } = await import('jspdf')
+      
+      // Fetch branding settings from Firebase
+      let brandingSettings: any = {}
+      try {
+        const { doc, getDoc } = await import('firebase/firestore')
+        const settingsRef = doc(db, 'settings/branding')
+        const settingsDoc = await getDoc(settingsRef)
+        if (settingsDoc.exists()) {
+          brandingSettings = settingsDoc.data()
+        }
+      } catch (e) {
+        console.warn('Could not fetch branding settings:', e)
+      }
+
+      // Calculate totals
+      const items = [...(quotation.services || []), ...(quotation.products || [])]
+      const subtotal = quotation.subtotal || 0
+      const discountAmount = quotation.discountAmount || 0
+      const taxAmount = quotation.taxAmount || 0
+      const total = quotation.total || 0
+
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+      })
+
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      let yPosition = 15
+
+      // Company Logo and Branding Header
+      if (brandingSettings?.logo) {
+        try {
+          const logoImage = brandingSettings.logo
+          pdf.addImage(logoImage, 'PNG', 20, yPosition, 25, 20)
+          yPosition += 22
+        } catch (e) {
+          console.warn('Could not add logo:', e)
+          yPosition += 5
+        }
+      } else {
+        yPosition += 8
+      }
+
+      // Company Name and Contact Info
+      if (brandingSettings?.companyName) {
+        pdf.setFontSize(18)
+        pdf.setTextColor(30, 58, 138) // Blue-900
+        pdf.text(brandingSettings.companyName, 20, yPosition)
+        yPosition += 8
+      }
+
+      // Contact Information
+      if (brandingSettings?.contactEmail || brandingSettings?.contactPhone || brandingSettings?.contactAddress || brandingSettings?.website) {
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 100, 100)
+        const contactItems = []
+        if (brandingSettings?.contactEmail) contactItems.push(`Email: ${brandingSettings.contactEmail}`)
+        if (brandingSettings?.contactPhone) contactItems.push(`Phone: ${brandingSettings.contactPhone}`)
+        if (brandingSettings?.contactAddress) contactItems.push(`Address: ${brandingSettings.contactAddress}`)
+        if (brandingSettings?.website) contactItems.push(`Website: ${brandingSettings.website}`)
+        
+        contactItems.forEach(item => {
+          pdf.text(item, 20, yPosition)
+          yPosition += 3
+        })
+        yPosition += 3
+      }
+
+      // Border line
+      pdf.setDrawColor(37, 99, 235) // Blue-600
+      pdf.setLineWidth(1.5)
+      pdf.line(20, yPosition, pageWidth - 20, yPosition)
+      yPosition += 8
+
+      // Title
+      pdf.setFontSize(32)
+      pdf.setTextColor(30, 58, 138)
+      pdf.text('QUOTATION', 20, yPosition)
+      yPosition += 12
+
+      // Quote details header - 4 column grid
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100)
+      
+      const colWidth = (pageWidth - 40) / 4
+      const details = [
+        { label: 'Quote #', value: quotation.quoteNumber },
+        { label: 'Date', value: new Date(quotation.date).toLocaleDateString() },
+        { label: 'Valid Until', value: new Date(quotation.validUntil).toLocaleDateString() },
+        { label: 'Currency', value: quotation.currency }
+      ]
+      
+      details.forEach((detail, idx) => {
+        const x = 20 + (idx * colWidth)
+        pdf.text(detail.label, x, yPosition, { maxWidth: colWidth - 2 })
+        pdf.setTextColor(30, 58, 138)
+        pdf.setFontSize(10)
+        pdf.text(detail.value, x, yPosition + 5, { maxWidth: colWidth - 2 })
+        pdf.setTextColor(100, 100, 100)
+        pdf.setFontSize(8)
+      })
+      yPosition += 15
+
+      // Separator line
+      pdf.setDrawColor(220, 220, 220)
+      pdf.setLineWidth(0.5)
+      pdf.line(20, yPosition, pageWidth - 20, yPosition)
+      yPosition += 8
+
+      // Bill To section
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100)
+      pdf.text('BILL TO', 20, yPosition)
+      yPosition += 4
+      
+      pdf.setFontSize(10)
+      pdf.setTextColor(30, 58, 138)
+      pdf.text(quotation.client, 20, yPosition)
+      yPosition += 5
+
+      pdf.setFontSize(8)
+      pdf.setTextColor(80, 80, 80)
+      if (quotation.company) {
+        pdf.text(`${quotation.company}`, 20, yPosition)
+        yPosition += 3
+      }
+      if (quotation.email) {
+        pdf.text(`${quotation.email}`, 20, yPosition)
+        yPosition += 3
+      }
+      if (quotation.phone) {
+        pdf.text(`${quotation.phone}`, 20, yPosition)
+        yPosition += 3
+      }
+      if (quotation.location) {
+        pdf.text(`${quotation.location}`, 20, yPosition)
+        yPosition += 3
+      }
+
+      yPosition += 5
+
+      // Services/Products table
+      if (items.length > 0) {
+        // Table header
+        pdf.setFillColor(239, 246, 255)
+        pdf.rect(20, yPosition, pageWidth - 40, 6, 'F')
+        
+        pdf.setFontSize(9)
+        pdf.setTextColor(30, 58, 138)
+        pdf.text('Description', 22, yPosition + 4)
+        pdf.text('Qty', 130, yPosition + 4)
+        pdf.text('Unit Price', 150, yPosition + 4)
+        pdf.text('Total', pageWidth - 25, yPosition + 4, { align: 'right' })
+        
+        yPosition += 8
+
+        // Table rows
+        pdf.setFontSize(9)
+        pdf.setTextColor(51, 51, 51)
+
+        items.forEach((item: any) => {
+          if (yPosition > 250) {
+            pdf.addPage()
+            yPosition = 20
+          }
+
+          const description = `${item.name}${item.description ? ` - ${item.description}` : ''}`
+          pdf.text(description, 22, yPosition)
+          pdf.text(String(item.quantity), 130, yPosition)
+          pdf.text(`${item.unitPrice?.toLocaleString()}`, 150, yPosition)
+          pdf.text(`${item.total?.toLocaleString()}`, pageWidth - 25, yPosition, { align: 'right' })
+          
+          yPosition += 5
+        })
+
+        yPosition += 5
+      }
+
+      // Summary section
+      yPosition += 5
+      const summaryX = pageWidth - 70
+      
+      pdf.setFontSize(9)
+      pdf.setTextColor(51, 51, 51)
+      pdf.text('Subtotal:', summaryX, yPosition)
+      pdf.text(`${subtotal?.toLocaleString()} ${quotation.currency}`, pageWidth - 20, yPosition, { align: 'right' })
+      yPosition += 5
+
+      if (discountAmount > 0) {
+        pdf.setTextColor(34, 197, 94)
+        pdf.text(`Discount (-${quotation.discount}${quotation.discountType === 'percentage' ? '%' : ''})`, summaryX, yPosition)
+        pdf.text(`${discountAmount?.toLocaleString()} ${quotation.currency}`, pageWidth - 20, yPosition, { align: 'right' })
+        yPosition += 5
+      }
+
+      pdf.setTextColor(51, 51, 51)
+      pdf.text(`Tax (${quotation.taxRate}%):`, summaryX, yPosition)
+      pdf.text(`${taxAmount?.toLocaleString()} ${quotation.currency}`, pageWidth - 20, yPosition, { align: 'right' })
+      yPosition += 6
+
+      // Total line
+      pdf.setDrawColor(100, 100, 100)
+      pdf.setLineWidth(0.5)
+      pdf.line(summaryX, yPosition, pageWidth - 20, yPosition)
+      yPosition += 5
+
+      pdf.setFontSize(12)
+      pdf.setTextColor(30, 58, 138)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('TOTAL:', summaryX, yPosition)
+      pdf.text(`${total?.toLocaleString()} ${quotation.currency}`, pageWidth - 20, yPosition, { align: 'right' })
+
+      // Save PDF
+      pdf.save(`${quotation.quoteNumber}.pdf`)
+      alert('✅ PDF downloaded successfully!')
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('❌ Error generating PDF. Please check console and try again.')
+    }
+  }
+
   // Get status badge style
   const getStatusBadgeStyle = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -202,14 +429,14 @@ export default function QuotationList({ onEdit, onView, onSend, refreshTrigger }
             placeholder="Search quotes, clients, companies..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-black"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
           />
         </div>
         <div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-black appearance-none bg-white font-medium"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 appearance-none bg-white font-medium"
           >
             <option value="All">All Statuses</option>
             <option value="Draft">Draft</option>
@@ -302,9 +529,9 @@ export default function QuotationList({ onEdit, onView, onSend, refreshTrigger }
                 </tr>
               ) : (
                 filtered.map((q) => (
-                  <tr key={q.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={q.id} className="hover:bg-blue-50 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="font-bold text-[13px] text-black mb-0.5">{q.quoteNumber}</p>
+                      <p className="font-bold text-[13px] text-blue-900 mb-0.5">{q.quoteNumber}</p>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">
                           Created: {formatTimestamp(q.createdAt)}
@@ -312,14 +539,14 @@ export default function QuotationList({ onEdit, onView, onSend, refreshTrigger }
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-bold text-[13px] text-black mb-0.5">{q.client}</p>
-                      <p className="text-[11px] text-gray-500 flex items-center gap-1.5 font-medium truncate max-w-[200px]">
+                      <p className="font-bold text-[13px] text-blue-900 mb-0.5">{q.client}</p>
+                      <p className="text-[11px] text-gray-500 flex items-center gap-1.5 font-medium truncate max-w-50">
                         {q.company}
                       </p>
                       <p className="text-[10px] text-gray-400 font-medium truncate">{q.email}</p>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="font-bold text-[13px] text-black mb-0.5">
+                      <p className="font-bold text-[13px] text-blue-900 mb-0.5">
                         {q.total?.toLocaleString()} {q.currency || 'AED'}
                       </p>
                       {q.discount && q.discount > 0 && (
@@ -345,7 +572,15 @@ export default function QuotationList({ onEdit, onView, onSend, refreshTrigger }
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                       
+                        
+                        <button 
+                          onClick={() => handleDownloadQuotation(q)}
+                          title="Download PDF" 
+                          className="p-1.5 hover:bg-green-50 rounded text-green-600 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+
                         <button 
                           onClick={() => onEdit(q)}
                           title="Edit" 

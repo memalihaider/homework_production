@@ -259,12 +259,12 @@ export default function QuotationApproval() {
       <div className="bg-white border border-gray-300 rounded p-4 shadow-none">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-black mb-1">Draft Quotation Approvals</h2>
+            <h2 className="text-lg font-bold text-blue-900 mb-1">Draft Quotation Approvals</h2>
             <p className="text-sm text-gray-500">Review and approve/reject draft quotations from Firebase</p>
           </div>
           <button 
             onClick={fetchQuotations}
-            className="px-4 py-2 bg-black text-white text-sm font-bold rounded hover:bg-gray-800"
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700"
           >
             Refresh List
           </button>
@@ -300,7 +300,7 @@ export default function QuotationApproval() {
       {/* Draft Quotations List */}
       <div className="bg-white border border-gray-300 rounded p-4 shadow-none">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[12px] uppercase font-bold text-black flex items-center gap-2">
+          <h3 className="text-[12px] uppercase font-bold text-blue-900 flex items-center gap-2">
             <FileCheck className="w-4 h-4" />
             Draft Quotations ({quotations.length})
           </h3>
@@ -312,7 +312,7 @@ export default function QuotationApproval() {
         {quotations.length > 0 ? (
           <div className="space-y-4">
             {quotations.map((q) => (
-              <div key={q.id} className="bg-white border border-gray-300 rounded overflow-hidden hover:border-black transition-all">
+              <div key={q.id} className="bg-white border border-gray-300 rounded overflow-hidden hover:border-blue-600 transition-all">
                 {/* Quotation Header */}
                 <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                   <div className="flex items-center justify-between">
@@ -321,12 +321,12 @@ export default function QuotationApproval() {
                         <FileText className="w-5 h-5 text-gray-500" />
                       </div>
                       <div>
-                        <h4 className="text-[15px] font-bold text-black">{q.quoteNumber}</h4>
+                        <h4 className="text-[15px] font-bold text-blue-900">{q.quoteNumber}</h4>
                         <p className="text-[11px] text-gray-500">Created: {formatDate(q.date)}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-black text-black">{q.total?.toLocaleString()} {q.currency}</p>
+                      <p className="text-2xl font-black text-blue-900">{q.total?.toLocaleString()} {q.currency}</p>
                       <p className="text-[11px] text-gray-500">Total Amount</p>
                     </div>
                   </div>
@@ -341,7 +341,7 @@ export default function QuotationApproval() {
                         <Building2 className="w-4 h-4 text-gray-400" />
                         <div>
                           <p className="text-[11px] font-bold text-gray-500">CLIENT</p>
-                          <p className="text-[13px] font-bold text-black">{q.client}</p>
+                          <p className="text-[13px] font-bold text-blue-900">{q.client}</p>
                           <p className="text-[11px] text-gray-500">{q.company}</p>
                         </div>
                       </div>
@@ -378,12 +378,12 @@ export default function QuotationApproval() {
                       </p>
                       <div className="bg-gray-50 rounded border border-gray-200 overflow-hidden">
                         <table className="w-full text-left">
-                          <thead className="bg-gray-100">
+                          <thead className="bg-blue-50">
                             <tr>
-                              <th className="px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Item</th>
-                              <th className="px-3 py-2 text-[10px] uppercase font-bold text-gray-500 text-center">Qty</th>
-                              <th className="px-3 py-2 text-[10px] uppercase font-bold text-gray-500 text-right">Price</th>
-                              <th className="px-3 py-2 text-[10px] uppercase font-bold text-gray-500 text-right">Total</th>
+                              <th className="px-3 py-2 text-[10px] uppercase font-bold text-blue-700">Item</th>
+                              <th className="px-3 py-2 text-[10px] uppercase font-bold text-blue-700 text-center">Qty</th>
+                              <th className="px-3 py-2 text-[10px] uppercase font-bold text-blue-700 text-right">Price</th>
+                              <th className="px-3 py-2 text-[10px] uppercase font-bold text-blue-700 text-right">Total</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
@@ -397,7 +397,7 @@ export default function QuotationApproval() {
                                 </td>
                                 <td className="px-3 py-2 text-center text-[11px] font-bold">{service.quantity}</td>
                                 <td className="px-3 py-2 text-right text-[11px] font-bold">{service.unitPrice?.toLocaleString()} AED</td>
-                                <td className="px-3 py-2 text-right text-[11px] font-bold text-black">{service.total?.toLocaleString()} AED</td>
+                                <td className="px-3 py-2 text-right text-[11px] font-bold text-blue-900">{service.total?.toLocaleString()} AED</td>
                               </tr>
                             ))}
                             {q.products?.map((product, index) => (
@@ -410,7 +410,7 @@ export default function QuotationApproval() {
                                 </td>
                                 <td className="px-3 py-2 text-center text-[11px] font-bold">{product.quantity}</td>
                                 <td className="px-3 py-2 text-right text-[11px] font-bold">{product.unitPrice?.toLocaleString()} AED</td>
-                                <td className="px-3 py-2 text-right text-[11px] font-bold text-black">{product.total?.toLocaleString()} AED</td>
+                                <td className="px-3 py-2 text-right text-[11px] font-bold text-blue-900">{product.total?.toLocaleString()} AED</td>
                               </tr>
                             ))}
                           </tbody>
@@ -439,7 +439,7 @@ export default function QuotationApproval() {
                         <p className="text-[10px] uppercase font-bold text-gray-400">Tax ({q.taxRate}%)</p>
                         <p className="text-lg font-bold text-gray-700">+{q.taxAmount?.toLocaleString()} AED</p>
                       </div>
-                      <div className="bg-black p-3 rounded">
+                      <div className="bg-blue-600 p-3 rounded">
                         <p className="text-[10px] uppercase font-bold text-white">Total Amount</p>
                         <p className="text-lg font-bold text-white">{q.total?.toLocaleString()} AED</p>
                       </div>
@@ -452,7 +452,7 @@ export default function QuotationApproval() {
                       <button 
                         onClick={() => handleApprove(q.id)}
                         disabled={processingId === q.id}
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-black text-white text-[11px] uppercase font-bold rounded hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-[11px] uppercase font-bold rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {processingId === q.id ? (
                           <>

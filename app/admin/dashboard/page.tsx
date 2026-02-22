@@ -3,20 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  AreaChart, 
-  Area 
-} from 'recharts'
+import { RevenueChart, LeadPieChart, JobDistributionChart } from './charts'
 import { 
   TrendingUp, 
   Users, 
@@ -815,26 +802,7 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="h-87.5 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesData}>
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                <Tooltip 
-                  formatter={(value) => [`AED ${value}`, '']}
-                  labelFormatter={(label) => `Month: ${label}`}
-                  contentStyle={{ backgroundColor: '#fff', borderColor: '#e5e7eb', borderRadius: '12px' }} 
-                />
-                <Area type="monotone" dataKey="sales" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" name="Revenue" />
-                <Area type="monotone" dataKey="expenses" stroke="#a855f7" strokeWidth={2} fill="transparent" strokeDasharray="5 5" name="Expenses" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <RevenueChart data={salesData} />
           </div>
         </div>
 
@@ -842,25 +810,7 @@ export default function AdminDashboard() {
           <h3 className="text-xl font-black text-gray-900 mb-2">Lead Distribution</h3>
           <p className="text-sm text-gray-500 mb-8">Leads by pipeline stage</p>
           <div className="h-75 w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie 
-                  data={leadData} 
-                  cx="50%" 
-                  cy="50%" 
-                  innerRadius={70} 
-                  outerRadius={90} 
-                  paddingAngle={2} 
-                  dataKey="value"
-                  label={(entry) => entry.name}
-                >
-                  {leadData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [`${value} leads`, 'Count']} />
-              </PieChart>
-            </ResponsiveContainer>
+            <LeadPieChart data={leadData} />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-3xl font-black text-gray-900">{leads.length}</span>
               <span className="text-xs font-bold text-gray-500 uppercase">Total Leads</span>
